@@ -11,6 +11,16 @@ from mbrl.types import TransitionBatch
 from .model import LossOutput, Model
 from .util import Conv2dDecoder, Conv2dEncoder
 
+def dreamer_init(m: nn.Module):
+    """Initializes with the standard Keras initializations."""
+    if isinstance(m, nn.GRUCell):
+        torch.nn.init.orthogonal_(m.weight_hh.data, gain=1.0)
+        torch.nn.init.xavier_uniform_(m.weight_ih.data, gain=1.0)
+        torch.nn.init.zeros_(m.bias_ih.data)
+        torch.nn.init.zeros_(m.bias_hh.data)
+    elif isinstance(m, nn.Linear) or isinstance(m, nn.Conv2d):
+        torch.nn.init.xavier_uniform_(m.weight.data, gain=1.0)
+        torch.nn.init.zeros_(m.bias.data)
 
 @dataclass
 class StatesAndBeliefs:
@@ -65,6 +75,7 @@ class BeliefModel(nn.Module):
             nn.Linear(latent_state_size + action_size, belief_size), nn.ReLU()
         )
         self.rnn = torch.nn.GRUCell(belief_size, belief_size)
+        self.apply(dreamer_init)
 
     def forward(
         self,
@@ -83,6 +94,8 @@ class MeanStdSplit(nn.Module):
         super().__init__()
         self.min_std = min_std
         self.latent_state_size = latent_state_size
+        # technically unnecessary to initialize this since it has no learnt params
+        self.apply(dreamer_init)
 
     def forward(self, state_dist_params: torch.Tensor) -> torch.Tensor:
         mean = state_dist_params[:, : self.latent_state_size]
@@ -150,6 +163,7 @@ class PlaNetModel(Model):
             latent_state_size + belief_size, decoder_config[0], decoder_config[1]
         )
 
+        self.apply(dreamer_init)
         self.to(self.device)
 
         self._current_belief_for_sample_method: torch.Tensor = None
@@ -270,6 +284,7 @@ class PlaNetModel(Model):
             pred_obs,
         ) = self.forward(obs, act)
 
+        obs = obs / 255.0 - 0.5
         reconstruction_loss = (
             F.mse_loss(obs, pred_obs, reduction="none").sum((-1, -2, -3)).mean()
         )
@@ -312,7 +327,10 @@ class PlaNetModel(Model):
         optimizer.zero_grad()
         loss, meta = self.loss(model_in, target)
         loss.backward()
-        nn.utils.clip_grad_norm_(self.parameters(), 1000, norm_type=2)
+        # TODO(eugenevinitsky) this clips by concatenating all params, TF clips
+        # by taking the norm of each element of the params and using the sum of those
+        # norms https://www.tensorflow.org/api_docs/python/tf/clip_by_global_norm
+        nn.utils.clip_grad_norm_(self.parameters(), 100, norm_type=2)
 
         with torch.no_grad():
             grad_norm = 0.0
