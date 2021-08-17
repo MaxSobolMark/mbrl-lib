@@ -58,6 +58,7 @@ class MujocoGymPixelWrapper(gym.Wrapper):
         if self._bits != 8:
             ratio = 256 // 2 ** self._bits
             obs = obs // ratio
+            obs *= ratio
         return obs
 
     def _convert_action(self, action):
