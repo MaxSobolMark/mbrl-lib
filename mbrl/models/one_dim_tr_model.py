@@ -52,8 +52,9 @@ class OneDTransitionRewardModel(Model):
             which will be used every time the model is called using the methods in this
             class. Assumes the given base model has an attributed ``in_size``.
             To update the normalizer statistics, the user needs to call
-            :meth:`update_normalizer` on the desired data before using the model.
-            Defaults to ``False``.
+            :meth:`update_normalizer` before using the model. Defaults to ``False``.
+        normalize_double_precision (bool): if ``True``, the normalizer will work with
+            double precision.
         learned_rewards (bool): if ``True``, the wrapper considers the last output of the model
             to correspond to rewards predictions, and will use it to construct training
             targets for the model and when returning model predictions. Defaults to ``True``.
@@ -76,6 +77,7 @@ class OneDTransitionRewardModel(Model):
         model: Model,
         target_is_delta: bool = True,
         normalize: bool = False,
+        normalize_double_precision: bool = False,
         learned_rewards: bool = True,
         obs_process_fn: Optional[mbrl.types.ObsProcessFnType] = None,
         no_delta_list: Optional[List[int]] = None,
@@ -86,7 +88,9 @@ class OneDTransitionRewardModel(Model):
         self.input_normalizer: Optional[mbrl.util.math.Normalizer] = None
         if normalize:
             self.input_normalizer = mbrl.util.math.Normalizer(
-                self.model.in_size, self.model.device
+                self.model.in_size,
+                self.model.device,
+                dtype=torch.double if normalize_double_precision else torch.float,
             )
         self.device = self.model.device
         self.learned_rewards = learned_rewards
@@ -110,12 +114,11 @@ class OneDTransitionRewardModel(Model):
     ) -> torch.Tensor:
         if self.obs_process_fn:
             obs = self.obs_process_fn(obs)
-        obs = model_util.to_tensor(obs).to(self.device)
-        action = model_util.to_tensor(action).to(self.device)
-        model_in = torch.cat([obs, action], dim=obs.ndim - 1)
+        model_in_np = np.concatenate([obs, action], axis=obs.ndim - 1)
         if self.input_normalizer:
-            model_in = self.input_normalizer.normalize(model_in)
-        return model_in, obs, action
+            # Normalizer lives on device
+            return self.input_normalizer.normalize(model_in_np).float().to(self.device)
+        return model_util.to_tensor(model_in_np).to(self.device)
 
     def _process_batch(
         self, batch: mbrl.types.TransitionBatch, _as_float: bool = False
@@ -135,7 +138,7 @@ class OneDTransitionRewardModel(Model):
             target = torch.cat([target_obs, reward], dim=obs.ndim - 1)
         else:
             target = target_obs
-        return model_in, target
+        return model_in.float(), target.float()
 
     def forward(self, x: torch.Tensor, *args, **kwargs) -> Tuple[torch.Tensor, ...]:
         """Calls forward method of base model with the given input and args."""
