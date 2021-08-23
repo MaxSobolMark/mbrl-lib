@@ -114,11 +114,13 @@ class OneDTransitionRewardModel(Model):
     ) -> torch.Tensor:
         if self.obs_process_fn:
             obs = self.obs_process_fn(obs)
-        model_in_np = np.concatenate([obs, action], axis=obs.ndim - 1)
+        obs = model_util.to_tensor(obs).to(self.device)
+        action = model_util.to_tensor(action).to(self.device)
+        model_in = torch.cat([obs, action], dim=obs.ndim - 1)
         if self.input_normalizer:
             # Normalizer lives on device
-            return self.input_normalizer.normalize(model_in_np).float().to(self.device)
-        return model_util.to_tensor(model_in_np).to(self.device)
+            model_in = self.input_normalizer.normalize(model_in).float().to(self.device)
+        return model_in, obs.float(), action.float()
 
     def _process_batch(
         self, batch: mbrl.types.TransitionBatch, _as_float: bool = False
