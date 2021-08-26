@@ -9,6 +9,7 @@ from typing import Counter, Dict, List, Mapping, Tuple, Union
 
 import termcolor
 import torch
+import wandb
 
 LogFormatType = List[Tuple[str, str, str]]
 LogTypes = Union[int, float, torch.Tensor]
@@ -43,15 +44,18 @@ class AverageMeter(object):
 
 
 class MetersGroup(object):
-    def __init__(self, file_name: Union[str, pathlib.Path], formatting: LogFormatType):
+    def __init__(self, file_name: Union[str, pathlib.Path],
+                 formatting: LogFormatType):
         self._csv_file_path = self._prepare_file(file_name, ".csv")
         self._formatting = formatting
-        self._meters: Dict[str, AverageMeter] = collections.defaultdict(AverageMeter)
+        self._meters: Dict[str, AverageMeter] = collections.defaultdict(
+            AverageMeter)
         self._csv_file = open(self._csv_file_path, "w")
         self._csv_writer = None
 
     @staticmethod
-    def _prepare_file(prefix: Union[str, pathlib.Path], suffix: str) -> pathlib.Path:
+    def _prepare_file(prefix: Union[str, pathlib.Path],
+                      suffix: str) -> pathlib.Path:
         file_path = pathlib.Path(prefix).with_suffix(suffix)
         if file_path.exists():
             file_path.unlink()
@@ -62,9 +66,9 @@ class MetersGroup(object):
 
     def _dump_to_csv(self, data):
         if self._csv_writer is None:
-            self._csv_writer = csv.DictWriter(
-                self._csv_file, fieldnames=sorted(data.keys()), restval=0.0
-            )
+            self._csv_writer = csv.DictWriter(self._csv_file,
+                                              fieldnames=sorted(data.keys()),
+                                              restval=0.0)
             self._csv_writer.writeheader()
         self._csv_writer.writerow(data)
         self._csv_file.flush()
@@ -89,11 +93,16 @@ class MetersGroup(object):
             pieces.append(self._format(disp_key, value, ty))
         print(" | ".join(pieces))
 
-    def dump(self, step: int, prefix: str, save: bool = True, color: str = "yellow"):
+    def dump(self,
+             step: int,
+             prefix: str,
+             save: bool = True,
+             color: str = "yellow"):
         if len(self._meters) == 0:
             return
         if save:
-            data = dict([(key, meter.value()) for key, meter in self._meters.items()])
+            data = dict([(key, meter.value())
+                         for key, meter in self._meters.items()])
             data["step"] = step
             self._dump_to_csv(data)
             self._dump_to_console(data, prefix, color)
@@ -116,10 +125,9 @@ class Logger(object):
         enable_back_compatible (bool, optional): if ``True``, this logger can be used in the
             methods in the `pytorch_sac` library. Defaults to ``False``.
     """
-
-    def __init__(
-        self, log_dir: Union[str, pathlib.Path], enable_back_compatible: bool = False
-    ):
+    def __init__(self,
+                 log_dir: Union[str, pathlib.Path],
+                 enable_back_compatible: bool = False):
         self._log_dir = pathlib.Path(log_dir)
         self._groups: Dict[str, Tuple[MetersGroup, int, str]] = {}
         self._group_steps: Counter[str] = collections.Counter()
@@ -154,7 +162,8 @@ class Logger(object):
         if group_name in self._groups:
             print(f"Group {group_name} has already been registered.")
             return
-        new_group = MetersGroup(self._log_dir / group_name, formatting=log_format)
+        new_group = MetersGroup(self._log_dir / group_name,
+                                formatting=log_format)
         self._groups[group_name] = (new_group, dump_frequency, color)
         self._group_steps[group_name] = 0
 
@@ -164,7 +173,10 @@ class Logger(object):
     def log_param(self, *_args):
         pass
 
-    def log_data(self, group_name: str, data: Mapping[str, LogTypes]):
+    def log_data(self,
+                 group_name: str,
+                 data: Mapping[str, LogTypes],
+                 log_to_wandb: bool = True):
         """Logs the data contained in a given dictionary to the given logging group.
 
         Args:
@@ -184,17 +196,24 @@ class Logger(object):
         if self._group_steps[group_name] % dump_frequency == 0:
             self._dump(group_name)
 
+        if log_to_wandb:
+            wandb.log({group_name: data})
+
     def _dump(self, group_name: str, save: bool = True):
         if group_name not in self._groups:
             raise ValueError(f"Group {group_name} has not been registered.")
         meter_group, dump_frequency, color = self._groups[group_name]
-        meter_group.dump(self._group_steps[group_name], group_name, save, color=color)
+        meter_group.dump(self._group_steps[group_name],
+                         group_name,
+                         save,
+                         color=color)
 
     # ----------------------------------------------------------- #
     # These methods are here for backward compatibility with pytorch_sac
     @staticmethod
     def _split_group_and_key(group_and_key: str) -> Tuple[str, str]:
-        assert group_and_key.startswith("train") or group_and_key.startswith("eval")
+        assert group_and_key.startswith("train") or group_and_key.startswith(
+            "eval")
         if group_and_key.startswith("train"):
             key = f"{group_and_key[len('train') + 1:]}"
             group_name = "train"

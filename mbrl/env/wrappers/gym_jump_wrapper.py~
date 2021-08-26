@@ -1,0 +1,2 @@
+"""Reward wrapper that gives rewards for positive change in z axis.
+   Based on MOPO: https://arxiv.org/pdf/2005.13239.pdf"""

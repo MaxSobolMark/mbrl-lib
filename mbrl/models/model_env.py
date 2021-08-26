@@ -33,7 +33,6 @@ class ModelEnv:
             same device as the given model). If None (default value), a new generator will be
             created using the default torch seed.
     """
-
     def __init__(
         self,
         env: gym.Env,
@@ -80,8 +79,7 @@ class ModelEnv:
         """
         assert len(initial_obs_batch.shape) == 2  # batch, obs_dim
         batch = mbrl.types.TransitionBatch(
-            initial_obs_batch.astype(np.float32), None, None, None, None
-        )
+            initial_obs_batch.astype(np.float32), None, None, None, None)
         self._current_obs = self.dynamics_model.reset(batch, rng=self._rng)
         self._return_as_np = return_as_np
         if self._return_as_np:
@@ -89,7 +87,9 @@ class ModelEnv:
         return self._current_obs
 
     def step(
-        self, actions: mbrl.types.TensorType, sample: bool = False
+        self,
+        actions: mbrl.types.TensorType,
+        sample: bool = False
     ) -> Tuple[mbrl.types.TensorType, mbrl.types.TensorType, np.ndarray, Dict]:
         """Steps the model environment with the given batch of actions.
 
@@ -110,19 +110,15 @@ class ModelEnv:
             # if actions is tensor, code assumes it's already on self.device
             if isinstance(actions, np.ndarray):
                 actions = torch.from_numpy(actions).to(self.device)
-            model_in = mbrl.types.TransitionBatch(
-                self._current_obs, actions, None, None, None
-            )
+            model_in = mbrl.types.TransitionBatch(self._current_obs, actions,
+                                                  None, None, None)
             next_observs, pred_rewards = self.dynamics_model.sample(
                 model_in,
                 deterministic=not sample,
                 rng=self._rng,
             )
-            rewards = (
-                pred_rewards
-                if self.reward_fn is None
-                else self.reward_fn(actions, next_observs)
-            )
+            rewards = (pred_rewards if self.reward_fn is None else
+                       self.reward_fn(actions, next_observs))
             dones = self.termination_fn(actions, next_observs)
             self._current_obs = next_observs
             if self._return_as_np:
@@ -154,22 +150,21 @@ class ModelEnv:
             (torch.Tensor): the accumulated reward for each action sequence, averaged over its
             particles.
         """
-        assert (
-            len(action_sequences.shape) == 3
-        )  # population_size, horizon, action_shape
+        assert (len(action_sequences.shape) == 3
+                )  # population_size, horizon, action_shape
         population_size, horizon, action_dim = action_sequences.shape
         initial_obs_batch = np.tile(
-            initial_state, (num_particles * population_size, 1)
-        ).astype(np.float32)
+            initial_state,
+            (num_particles * population_size, 1)).astype(np.float32)
         self.reset(initial_obs_batch, return_as_np=False)
         batch_size = initial_obs_batch.shape[0]
         total_rewards = torch.zeros(batch_size, 1).to(self.device)
         terminated = torch.zeros(batch_size, 1, dtype=bool).to(self.device)
         for time_step in range(horizon):
             actions_for_step = action_sequences[:, time_step, :]
-            action_batch = torch.repeat_interleave(
-                actions_for_step, num_particles, dim=0
-            )
+            action_batch = torch.repeat_interleave(actions_for_step,
+                                                   num_particles,
+                                                   dim=0)
             _, rewards, dones, _ = self.step(action_batch, sample=True)
             rewards[terminated] = 0
             terminated |= dones

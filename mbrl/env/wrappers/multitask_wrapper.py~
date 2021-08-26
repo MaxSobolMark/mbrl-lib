@@ -1,0 +1,1 @@
+"""Multitask wrapper that appends to observations a one-hot vector with the task index."""

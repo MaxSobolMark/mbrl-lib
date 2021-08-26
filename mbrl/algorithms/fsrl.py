@@ -3,7 +3,9 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 import os
-from typing import Callable, Optional, Tuple
+from typing import Optional, List
+from enum import Enum
+import gtimer as gt
 
 import gym
 import numpy as np
@@ -12,31 +14,40 @@ import torch
 
 import mbrl.constants
 import mbrl.models
+from mbrl.models.lifelong_learning_model import LifelongLearningModel
 import mbrl.planning
 import mbrl.types
 import mbrl.util
 import mbrl.util.common
+from mbrl.util.lifelong_learning import make_task_name_to_index_map
 import mbrl.util.math
 
 EVAL_LOG_FORMAT = mbrl.constants.EVAL_LOG_FORMAT
 
 
+class PolicyType(Enum):
+    EXPLICIT_POLICY = 'EXPLICIT_POLICY'
+    CEM_PLANNING = 'CEM_PLANNING'
+    COMBINED = 'COMBINED'
+
+    def __str__(self) -> str:
+        return self.value
+
+
 def train(
-    env: gym.Env,
-    termination_fn: mbrl.types.TermFnType,
-    reward_fn: mbrl.types.RewardFnType,
+    lifelong_learning_envs: List[gym.Env],
+    lifelong_learning_task_names: List[str],
+    lifelong_learning_termination_fns: List[mbrl.types.TermFnType],
+    lifelong_learning_reward_fns: List[mbrl.types.RewardFnType],
     cfg: omegaconf.DictConfig,
     silent: bool = False,
     work_dir: Optional[str] = None,
-    forward_postprocess_fn: Callable[[
-        torch.Tensor, torch.Tensor, torch.Tensor, torch.nn.parameter.Parameter
-    ], Tuple[torch.Tensor, torch.Tensor]] = None,
 ) -> np.float32:
     # ------------------- Initialization -------------------
     debug_mode = cfg.get("debug_mode", False)
 
-    obs_shape = env.observation_space.shape
-    act_shape = env.action_space.shape
+    obs_shape = lifelong_learning_envs[0].observation_space.shape
+    act_shape = lifelong_learning_envs[0].action_space.shape
 
     rng = np.random.default_rng(seed=cfg.seed)
     torch_generator = torch.Generator(device=cfg.device)
@@ -55,36 +66,39 @@ def train(
                               color="green")
 
     # -------- Create and populate initial env dataset --------
+    task_name_to_task_index = make_task_name_to_index_map(
+        lifelong_learning_task_names)
+    num_tasks = len(task_name_to_task_index.keys())
     dynamics_model = mbrl.util.common.create_one_dim_tr_model(
         cfg, obs_shape, act_shape)
-    # Max change
-    from mbrl.models.lifelong_learning_model import LifelongLearningModel
     dynamics_model = LifelongLearningModel(
         dynamics_model,
-        num_tasks=0,
-        observe_task_id=True,
-        forward_postprocess_fn=forward_postprocess_fn,
+        num_tasks,
+        observe_task_id=cfg.overrides.lifelong_learning.observe_task_id,
+        forward_postprocess_fn=cfg.overrides.lifelong_learning.
+        forward_postprocess_fn,
     )
-    # end of Max change
     use_double_dtype = cfg.algorithm.get("normalize_double_precision", False)
     dtype = np.double if use_double_dtype else np.float32
-    replay_buffer = mbrl.util.common.create_replay_buffer(
-        cfg,
-        obs_shape,
-        act_shape,
-        rng=rng,
-        obs_type=dtype,
-        action_type=dtype,
-        reward_type=dtype,
-    )
+    task_replay_buffers = [
+        mbrl.util.common.create_replay_buffer(
+            cfg,
+            obs_shape,
+            act_shape,
+            rng=rng,
+            obs_type=dtype,
+            action_type=dtype,
+            reward_type=dtype,
+        ) for _ in range(num_tasks)
+    ]
     mbrl.util.common.rollout_agent_trajectories(
-        env,
+        lifelong_learning_envs[0],
         cfg.algorithm.initial_exploration_steps,
-        mbrl.planning.RandomAgent(env),
+        mbrl.planning.RandomAgent(lifelong_learning_envs[0]),
         {},
-        replay_buffer=replay_buffer,
+        replay_buffer=task_replay_buffers[0],
     )
-    replay_buffer.save(work_dir)
+    task_replay_buffers[0].save(work_dir)
 
     # ---------------------------------------------------------
     # ---------- Create model environment and agent -----------

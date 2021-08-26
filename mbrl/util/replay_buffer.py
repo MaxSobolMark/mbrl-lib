@@ -11,14 +11,15 @@ import numpy as np
 from mbrl.types import TransitionBatch
 
 
-def _consolidate_batches(batches: Sequence[TransitionBatch]) -> TransitionBatch:
+def _consolidate_batches(
+        batches: Sequence[TransitionBatch]) -> TransitionBatch:
     len_batches = len(batches)
     b0 = batches[0]
-    obs = np.empty((len_batches,) + b0.obs.shape, dtype=b0.obs.dtype)
-    act = np.empty((len_batches,) + b0.act.shape, dtype=b0.act.dtype)
-    next_obs = np.empty((len_batches,) + b0.obs.shape, dtype=b0.obs.dtype)
-    rewards = np.empty((len_batches,) + b0.rewards.shape, dtype=np.float32)
-    dones = np.empty((len_batches,) + b0.dones.shape, dtype=bool)
+    obs = np.empty((len_batches, ) + b0.obs.shape, dtype=b0.obs.dtype)
+    act = np.empty((len_batches, ) + b0.act.shape, dtype=b0.act.dtype)
+    next_obs = np.empty((len_batches, ) + b0.obs.shape, dtype=b0.obs.dtype)
+    rewards = np.empty((len_batches, ) + b0.rewards.shape, dtype=np.float32)
+    dones = np.empty((len_batches, ) + b0.dones.shape, dtype=bool)
     for i, b in enumerate(batches):
         obs[i] = b.obs
         act[i] = b.act
@@ -50,7 +51,6 @@ class TransitionIterator:
         rng (np.random.Generator, optional): a random number generator when sampling
             batches. If None (default value), a new default generator will be used.
     """
-
     def __init__(
         self,
         transitions: TransitionBatch,
@@ -70,7 +70,8 @@ class TransitionIterator:
         start_idx = self._current_batch * self.batch_size
         if start_idx >= self.num_stored:
             raise StopIteration
-        end_idx = min((self._current_batch + 1) * self.batch_size, self.num_stored)
+        end_idx = min((self._current_batch + 1) * self.batch_size,
+                      self.num_stored)
         order_indices = range(start_idx, end_idx)
         indices = self._order[order_indices]
         self._current_batch += 1
@@ -122,7 +123,6 @@ class BootstrapIterator(TransitionIterator):
         will then batch the result of of ``self[item]`` along a model dimension, where each
         batch is sampled independently.
     """
-
     def __init__(
         self,
         transitions: TransitionBatch,
@@ -132,16 +132,18 @@ class BootstrapIterator(TransitionIterator):
         permute_indices: bool = True,
         rng: Optional[np.random.Generator] = None,
     ):
-        super().__init__(
-            transitions, batch_size, shuffle_each_epoch=shuffle_each_epoch, rng=rng
-        )
+        super().__init__(transitions,
+                         batch_size,
+                         shuffle_each_epoch=shuffle_each_epoch,
+                         rng=rng)
         self._ensemble_size = ensemble_size
         self._permute_indices = permute_indices
         self._bootstrap_iter = ensemble_size > 1
         self.member_indices = self._sample_member_indices()
 
     def _sample_member_indices(self) -> np.ndarray:
-        member_indices = np.empty((self.ensemble_size, self.num_stored), dtype=int)
+        member_indices = np.empty((self.ensemble_size, self.num_stored),
+                                  dtype=int)
         if self._permute_indices:
             for i in range(self.ensemble_size):
                 member_indices[i] = self._rng.permutation(self.num_stored)
@@ -214,7 +216,6 @@ class SequenceTransitionIterator(BootstrapIterator):
         max_batches_per_loop (int, optional): if given, specifies how many batches
             to return (at most) over a full loop of the iterator.
     """
-
     def __init__(
         self,
         transitions: TransitionBatch,
@@ -228,14 +229,12 @@ class SequenceTransitionIterator(BootstrapIterator):
     ):
         self._sequence_length = sequence_length
         self._valid_starts = self._get_indices_valid_starts(
-            trajectory_indices, sequence_length
-        )
+            trajectory_indices, sequence_length)
         self._max_batches_per_loop = max_batches_per_loop
         if len(self._valid_starts) < 0.5 * len(trajectory_indices):
             warnings.warn(
                 "More than 50% of the trajectories were discarded for being shorter "
-                "than the specified length."
-            )
+                "than the specified length.")
         # no need to pass transitions to super(), since it's only used by __getitem__,
         # which this class replaces. Passing the set of possible starts allow us to
         # use all the indexing machinery of the superclasses.
@@ -269,10 +268,8 @@ class SequenceTransitionIterator(BootstrapIterator):
         return self
 
     def __next__(self):
-        if (
-            self._max_batches_per_loop is not None
-            and self._current_batch >= self._max_batches_per_loop
-        ):
+        if (self._max_batches_per_loop is not None
+                and self._current_batch >= self._max_batches_per_loop):
             raise StopIteration
         return super().__next__()
 
@@ -287,8 +284,7 @@ class SequenceTransitionIterator(BootstrapIterator):
         increment_array = np.tile(np.arange(self._sequence_length), len(item))
         full_trajectory_indices = start_indices + increment_array
         return self.transitions[full_trajectory_indices].add_new_batch_dim(
-            min(self.batch_size, len(item))
-        )
+            min(self.batch_size, len(item)))
 
 
 class ReplayBuffer:
@@ -316,7 +312,6 @@ class ReplayBuffer:
         When using ``max_trajectory_length`` it is the user's responsibility to ensure
         that trajectories are stored continuously in the replay buffer.
     """
-
     def __init__(
         self,
         capacity: int,
@@ -355,7 +350,8 @@ class ReplayBuffer:
         return self.trajectory_indices is not None
 
     @staticmethod
-    def _check_overlap(segment1: Tuple[int, int], segment2: Tuple[int, int]) -> bool:
+    def _check_overlap(segment1: Tuple[int, int],
+                       segment2: Tuple[int, int]) -> bool:
         s1, e1 = segment1
         s2, e2 = segment2
         return (s1 <= s2 < e1) or (s1 < e2 <= e1)
@@ -379,15 +375,15 @@ class ReplayBuffer:
         if done:
             self.close_trajectory()
         else:
-            partial_trajectory = (self._start_last_trajectory, self.cur_idx + 1)
+            partial_trajectory = (self._start_last_trajectory,
+                                  self.cur_idx + 1)
             self.remove_overlapping_trajectories(partial_trajectory)
         if self.cur_idx >= len(self.obs):
             warnings.warn(
                 "The replay buffer was filled before current trajectory finished. "
                 "The history of the current partial trajectory will be discarded. "
                 "Make sure you set `max_trajectory_length` to the appropriate value "
-                "for your problem."
-            )
+                "for your problem.")
             self._start_last_trajectory = 0
             self.cur_idx = 0
             self.num_stored = len(self.obs)
@@ -397,11 +393,11 @@ class ReplayBuffer:
         self.remove_overlapping_trajectories(new_trajectory)
         self.trajectory_indices.append(new_trajectory)
 
-        if self.cur_idx - self._start_last_trajectory > (len(self.obs) - self.capacity):
+        if self.cur_idx - self._start_last_trajectory > (len(self.obs) -
+                                                         self.capacity):
             warnings.warn(
                 "A trajectory was saved with length longer than expected. "
-                "Unexpected behavior might occur."
-            )
+                "Unexpected behavior might occur.")
 
         if self.cur_idx >= self.capacity:
             self.cur_idx = 0
@@ -458,12 +454,12 @@ class ReplayBuffer:
             and done indicators, as numpy arrays, respectively; these will correspond
             to a full trajectory. The i-th transition corresponds
             to (obs[i], act[i], next_obs[i], rewards[i], dones[i])."""
-        if self.trajectory_indices is None or len(self.trajectory_indices) == 0:
+        if self.trajectory_indices is None or len(
+                self.trajectory_indices) == 0:
             return None
         idx = self._rng.choice(len(self.trajectory_indices))
-        indices = np.arange(
-            self.trajectory_indices[idx][0], self.trajectory_indices[idx][1]
-        )
+        indices = np.arange(self.trajectory_indices[idx][0],
+                            self.trajectory_indices[idx][1])
         return self._batch_from_indices(indices)
 
     def _batch_from_indices(self, indices: Sized) -> TransitionBatch:
@@ -488,11 +484,11 @@ class ReplayBuffer:
         path = pathlib.Path(save_dir) / "replay_buffer.npz"
         np.savez(
             path,
-            obs=self.obs[: self.num_stored],
-            next_obs=self.next_obs[: self.num_stored],
-            action=self.action[: self.num_stored],
-            reward=self.reward[: self.num_stored],
-            done=self.done[: self.num_stored],
+            obs=self.obs[:self.num_stored],
+            next_obs=self.next_obs[:self.num_stored],
+            action=self.action[:self.num_stored],
+            reward=self.reward[:self.num_stored],
+            done=self.done[:self.num_stored],
         )
 
     def load(self, load_dir: Union[pathlib.Path, str]):
@@ -558,8 +554,7 @@ class ReplayBuffer:
         warnings.warn(
             "ReplayBuffer.get_iterators() is deprecated and will be removed "
             " starting on v0.2.0. Use mbrl.util.common.get_basic_iterators() "
-            " instead."
-        )
+            " instead.")
         from mbrl.util.common import get_basic_buffer_iterators
 
         return get_basic_buffer_iterators(

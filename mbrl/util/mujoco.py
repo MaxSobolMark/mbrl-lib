@@ -66,20 +66,24 @@ def make_env(
 
         domain, task = cfg.overrides.env.split("___")[1].split("--")
         term_fn = getattr(mbrl.env.termination_fns, domain)
-        if hasattr(cfg.overrides, "reward_fn") and cfg.overrides.reward_fn is not None:
+        if hasattr(cfg.overrides,
+                   "reward_fn") and cfg.overrides.reward_fn is not None:
             reward_fn = getattr(mbrl.env.reward_fns, cfg.overrides.reward_fn)
         else:
-            reward_fn = getattr(mbrl.env.reward_fns, cfg.overrides.term_fn, None)
+            reward_fn = getattr(mbrl.env.reward_fns, cfg.overrides.term_fn,
+                                None)
         env = dmc2gym.make(domain_name=domain, task_name=task)
     elif "gym___" in cfg.overrides.env:
         import mbrl.env
 
         env = gym.make(cfg.overrides.env.split("___")[1])
         term_fn = getattr(mbrl.env.termination_fns, cfg.overrides.term_fn)
-        if hasattr(cfg.overrides, "reward_fn") and cfg.overrides.reward_fn is not None:
+        if hasattr(cfg.overrides,
+                   "reward_fn") and cfg.overrides.reward_fn is not None:
             reward_fn = getattr(mbrl.env.reward_fns, cfg.overrides.reward_fn)
         else:
-            reward_fn = getattr(mbrl.env.reward_fns, cfg.overrides.term_fn, None)
+            reward_fn = getattr(mbrl.env.reward_fns, cfg.overrides.term_fn,
+                                None)
     else:
         import mbrl.env.mujoco_envs
 
@@ -94,7 +98,7 @@ def make_env(
         elif cfg.overrides.env == "pets_reacher":
             env = mbrl.env.mujoco_envs.Reacher3DEnv()
             term_fn = mbrl.env.termination_fns.no_termination
-            reward_fn = None
+            reward_fn = getattr(mbrl.env.reward_fns, 'reacher', None)
         elif cfg.overrides.env == "pets_pusher":
             env = mbrl.env.mujoco_envs.PusherEnv()
             term_fn = mbrl.env.termination_fns.no_termination
@@ -109,9 +113,9 @@ def make_env(
             reward_fn = None
         else:
             raise ValueError("Invalid environment string.")
-        env = gym.wrappers.TimeLimit(
-            env, max_episode_steps=cfg.overrides.get("trial_length", 1000)
-        )
+        env = gym.wrappers.TimeLimit(env,
+                                     max_episode_steps=cfg.overrides.get(
+                                         "trial_length", 1000))
 
     learned_rewards = cfg.overrides.get("learned_rewards", True)
     if learned_rewards:
@@ -198,7 +202,6 @@ class freeze_mujoco_env:
     Args:
         env (:class:`gym.wrappers.TimeLimit`): the environment to freeze.
     """
-
     def __init__(self, env: gym.wrappers.TimeLimit):
         self._env = env
         self._init_state: np.ndarray = None
@@ -275,8 +278,7 @@ def get_current_state(env: gym.wrappers.TimeLimit) -> Tuple:
         return state, elapsed_steps, step_count
     else:
         raise NotImplementedError(
-            "Only gym mujoco and dm_control environments supported."
-        )
+            "Only gym mujoco and dm_control environments supported.")
 
 
 def set_env_state(state: Tuple, env: gym.wrappers.TimeLimit):
@@ -301,8 +303,7 @@ def set_env_state(state: Tuple, env: gym.wrappers.TimeLimit):
             env.env._env._step_count = state[2]
     else:
         raise NotImplementedError(
-            "Only gym mujoco and dm_control environments supported."
-        )
+            "Only gym mujoco and dm_control environments supported.")
 
 
 def rollout_mujoco_env(

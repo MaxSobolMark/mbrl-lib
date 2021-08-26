@@ -17,11 +17,9 @@ from mbrl.types import ModelInput
 LossOutput = Union[torch.Tensor, Tuple[torch.Tensor, Dict[str, Any]]]
 UpdateOutput = Union[float, Tuple[float, Dict[str, Any]]]
 
-
 _NO_META_WARNING_MSG = (
     "Starting in version v0.2.0, `model.loss()`, model.update(), and model.eval_score() "
-    "must all return a tuple with (loss, metadata)."
-)
+    "must all return a tuple with (loss, metadata).")
 
 
 # ---------------------------------------------------------------------------
@@ -44,7 +42,6 @@ class Model(nn.Module, abc.ABC):
     Args:
         device (str or torch.device): device to use for the model.
     """
-
     def __init__(
         self,
         *args,
@@ -63,9 +60,10 @@ class Model(nn.Module, abc.ABC):
         """
         pass
 
-    def sample(
-        self, x: ModelInput, deterministic: bool = False, **kwargs
-    ) -> Tuple[torch.Tensor, ...]:
+    def sample(self,
+               x: ModelInput,
+               deterministic: bool = False,
+               **kwargs) -> Tuple[torch.Tensor, ...]:
         """Samples an output of the dynamics model.
 
         The default implementation for all models is equivalent to `self.forward(x)[0]`.
@@ -80,7 +78,7 @@ class Model(nn.Module, abc.ABC):
             (tuple of tensor): any number of tensors that can be sampled from
                 the model (e.g., observations, rewards, terminations).
         """
-        return (self.forward(x)[0],)
+        return (self.forward(x)[0], )
 
     def reset(self, x: ModelInput, **kwargs) -> torch.Tensor:
         """Initializes any internal dependent state when using the model for simulation.
@@ -120,9 +118,9 @@ class Model(nn.Module, abc.ABC):
         """
 
     @abc.abstractmethod
-    def eval_score(
-        self, model_in: ModelInput, target: Optional[torch.Tensor] = None
-    ) -> LossOutput:
+    def eval_score(self,
+                   model_in: ModelInput,
+                   target: Optional[torch.Tensor] = None) -> LossOutput:
         """Computes an evaluation score for the model over the given input/target.
 
         This method should compute a non-reduced score for the model, intended mostly for
@@ -188,9 +186,9 @@ class Model(nn.Module, abc.ABC):
                 with torch.no_grad():
                     grad_norm = 0.0
                     for p in list(
-                        filter(lambda p: p.grad is not None, self.parameters())
-                    ):
-                        grad_norm += p.grad.data.norm(2).item() ** 2
+                            filter(lambda p: p.grad is not None,
+                                   self.parameters())):
+                        grad_norm += p.grad.data.norm(2).item()**2
                     meta["grad_norm"] = grad_norm
             optimizer.step()
             return loss.item(), meta
@@ -247,7 +245,6 @@ class Ensemble(Model, abc.ABC):
         deterministic (bool): if ``True``, the model will be trained using MSE loss and no
             logvar prediction will be done. Defaults to ``False``.
     """
-
     def __init__(
         self,
         num_members: int,
@@ -294,9 +291,9 @@ class Ensemble(Model, abc.ABC):
         """
 
     @abc.abstractmethod
-    def eval_score(
-        self, model_in: ModelInput, target: Optional[torch.Tensor] = None
-    ) -> torch.Tensor:
+    def eval_score(self,
+                   model_in: ModelInput,
+                   target: Optional[torch.Tensor] = None) -> torch.Tensor:
         """Computes an evaluation score for the model over the given input/target.
 
         This method should compute a non-reduced score for the model, intended mostly for
@@ -348,9 +345,9 @@ class Ensemble(Model, abc.ABC):
             (tensor): the sampled output.
         """
         if deterministic or self.deterministic:
-            return (self.forward(x, rng=rng)[0],)
+            return (self.forward(x, rng=rng)[0], )
         assert rng is not None
         means, logvars = self.forward(x, rng=rng)
         variances = logvars.exp()
         stds = torch.sqrt(variances)
-        return (torch.normal(means, stds, generator=rng),)
+        return (torch.normal(means, stds, generator=rng), )

@@ -1,0 +1,16 @@
+""""""
+import numpy as np
+from gym import Wrapper
+
+
+class ReachWrapper(Wrapper):
+    def __init__(self, env):
+        super(ReachWrapper, self).__init__(env)
+
+    def step(self, action):
+        observation, reward, done, info = self.env.step(action)
+        # take out the goal
+        observation = observation[:-3]
+        obs1, obs2 = np.split(observation, 2)
+        observation = np.concatenate([obs1[:4], obs2[:4]])
+        return observation, reward, done, info

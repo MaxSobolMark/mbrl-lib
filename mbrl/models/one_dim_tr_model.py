@@ -89,7 +89,8 @@ class OneDTransitionRewardModel(Model):
             self.input_normalizer = mbrl.util.math.Normalizer(
                 self.model.in_size,
                 self.model.device,
-                dtype=torch.double if normalize_double_precision else torch.float,
+                dtype=torch.double
+                if normalize_double_precision else torch.float,
             )
         self.device = self.model.device
         self.learned_rewards = learned_rewards
@@ -100,24 +101,23 @@ class OneDTransitionRewardModel(Model):
         self.num_elites = num_elites
         if not num_elites and isinstance(self.model, Ensemble):
             self.num_elites = self.model.num_members
-        self.elite_models: List[int] = (
-            list(range(self.model.num_members))
-            if isinstance(self.model, Ensemble)
-            else None
-        )
+        self.elite_models: List[int] = (list(range(self.model.num_members))
+                                        if isinstance(self.model, Ensemble)
+                                        else None)
 
-    def _get_model_input_from_np(
-        self, obs: np.ndarray, action: np.ndarray, device: torch.device
-    ) -> torch.Tensor:
+    def _get_model_input_from_np(self, obs: np.ndarray, action: np.ndarray,
+                                 device: torch.device) -> torch.Tensor:
         if self.obs_process_fn:
             obs = self.obs_process_fn(obs)
         model_in_np = np.concatenate([obs, action], axis=obs.ndim - 1)
         if self.input_normalizer:
             # Normalizer lives on device
-            return self.input_normalizer.normalize(model_in_np).float().to(device)
+            return self.input_normalizer.normalize(model_in_np).float().to(
+                device)
         return torch.from_numpy(model_in_np).to(device)
 
-    def _get_model_input_from_tensors(self, obs: torch.Tensor, action: torch.Tensor):
+    def _get_model_input_from_tensors(self, obs: torch.Tensor,
+                                      action: torch.Tensor):
         if self.obs_process_fn:
             obs = self.obs_process_fn(obs)
         model_in = torch.cat([obs, action], axis=obs.ndim - 1)
@@ -138,16 +138,12 @@ class OneDTransitionRewardModel(Model):
 
         model_in = self._get_model_input_from_np(obs, action, self.device)
         if self.learned_rewards:
-            target = (
-                torch.from_numpy(
-                    np.concatenate(
-                        [target_obs, np.expand_dims(reward, axis=reward.ndim)],
-                        axis=obs.ndim - 1,
-                    )
-                )
-                .float()
-                .to(self.device)
-            )
+            target = (torch.from_numpy(
+                np.concatenate(
+                    [target_obs,
+                     np.expand_dims(reward, axis=reward.ndim)],
+                    axis=obs.ndim - 1,
+                )).float().to(self.device))
         else:
             target = torch.from_numpy(target_obs).float().to(self.device)
         return model_in, target
@@ -236,7 +232,8 @@ class OneDTransitionRewardModel(Model):
         """
         assert target is None
         with torch.no_grad():
-            model_in, target = self._get_model_input_and_target_from_batch(batch)
+            model_in, target = self._get_model_input_and_target_from_batch(
+                batch)
             return self.model.eval_score(model_in, target=target)
 
     def get_output_and_targets(
@@ -255,7 +252,8 @@ class OneDTransitionRewardModel(Model):
             (tuple(tensor), tensor): the model outputs and the target for this batch.
         """
         with torch.no_grad():
-            model_in, target = self._get_model_input_and_target_from_batch(batch)
+            model_in, target = self._get_model_input_and_target_from_batch(
+                batch)
             output = self.model.forward(model_in)
         return output, target
 
@@ -284,7 +282,9 @@ class OneDTransitionRewardModel(Model):
         actions = model_util.to_tensor(x.act).to(self.device)
 
         model_in = self._get_model_input_from_tensors(obs, actions)
-        preds = self.model.sample(model_in, rng=rng, deterministic=deterministic)[0]
+        preds = self.model.sample(model_in,
+                                  rng=rng,
+                                  deterministic=deterministic)[0]
         next_observs = preds[:, :-1] if self.learned_rewards else preds
         if self.target_is_delta:
             tmp_ = next_observs + obs
@@ -295,8 +295,9 @@ class OneDTransitionRewardModel(Model):
         return next_observs, rewards
 
     def reset(  # type: ignore
-        self, x: mbrl.types.TransitionBatch, rng: Optional[torch.Generator] = None
-    ) -> torch.Tensor:
+            self,
+            x: mbrl.types.TransitionBatch,
+            rng: Optional[torch.Generator] = None) -> torch.Tensor:
         """Calls reset on the underlying model.
 
         Args:
@@ -317,8 +318,7 @@ class OneDTransitionRewardModel(Model):
         save_dir = pathlib.Path(save_dir)
         warnings.warn(
             "Future versions of OneDTrasitionRewardModel will rely on the underlying model's "
-            "save method, which will change state_dict keys."
-        )
+            "save method, which will change state_dict keys.")
         elite_path = save_dir / self._ELITE_FNAME
         if self.elite_models:
             with open(elite_path, "wb") as f:
@@ -332,19 +332,18 @@ class OneDTransitionRewardModel(Model):
         load_dir = pathlib.Path(load_dir)
         warnings.warn(
             "Future versions of OneDTrasitionRewardModel will rely on the underlying model's "
-            "save method, which will change state_dict keys."
-        )
+            "save method, which will change state_dict keys.")
         elite_path = load_dir / self._ELITE_FNAME
         if pathlib.Path.is_file(elite_path):
             warnings.warn(
                 "Future versions of OneDTrasitionRewardModel will load elite models from the same "
-                "checkpoint file as the model weights."
-            )
+                "checkpoint file as the model weights.")
             with open(elite_path, "rb") as f:
                 elite_models = pickle.load(f)
             self.set_elite(elite_models)
         else:
-            warnings.warn("No elite model information found in model load directory.")
+            warnings.warn(
+                "No elite model information found in model load directory.")
         if self.input_normalizer:
             self.input_normalizer.load(load_dir)
 
