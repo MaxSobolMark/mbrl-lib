@@ -29,6 +29,15 @@ def _consolidate_batches(
     return TransitionBatch(obs, act, next_obs, rewards, dones)
 
 
+def concatenate_batches(batches: Sequence[TransitionBatch]) -> TransitionBatch:
+    obs = np.concatenate([batch.obs for batch in batches], axis=0)
+    act = np.concatenate([batch.act for batch in batches], axis=0)
+    next_obs = np.concatenate([batch.next_obs for batch in batches], axis=0)
+    rewards = np.concatenate([batch.rewards for batch in batches], axis=0)
+    dones = np.concatenate([batch.dones for batch in batches], axis=0)
+    return TransitionBatch(obs, act, next_obs, rewards, dones)
+
+
 class TransitionIterator:
     """An iterator for batches of transitions.
 
@@ -474,14 +483,14 @@ class ReplayBuffer:
     def __len__(self):
         return self.num_stored
 
-    def save(self, save_dir: Union[pathlib.Path, str]):
+    def save(self, save_dir: Union[pathlib.Path, str], filename_suffix=''):
         """Saves the data in the replay buffer to a given directory.
 
         Args:
             save_dir (str): the directory to save the data to. File name will be
                 replay_buffer.npz.
         """
-        path = pathlib.Path(save_dir) / "replay_buffer.npz"
+        path = pathlib.Path(save_dir) / f"replay_buffer{filename_suffix}.npz"
         np.savez(
             path,
             obs=self.obs[:self.num_stored],

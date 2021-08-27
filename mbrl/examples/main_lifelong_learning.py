@@ -11,30 +11,33 @@ from omegaconf import OmegaConf
 import torch
 import wandb
 
-import mbrl.algorithms.mbpo as mbpo
-import mbrl.algorithms.pets as pets
+# import mbrl.algorithms.mbpo as mbpo
+import mbrl.algorithms.lifelong_learning_pets as lifelong_learning_pets
 import mbrl.util.mujoco as mujoco_util
 import mbrl.types
 from mbrl.env.wrappers.multitask_wrapper import MultitaskWrapper
+from mbrl.util.lifelong_learning import make_task_name_to_index_map
+from mbrl.env.reward_functions import DOMAIN_TO_REWARD_FUNCTION
 
 
 def make_env(
-    env_name: str, wrappers: List, learned_rewards: bool,
-    cfg: omegaconf.DictConfig
+    env_name: str,
+    wrappers: List,
+    learned_rewards: bool,
+    cfg: omegaconf.DictConfig,
+    env_cfg: omegaconf.DictConfig,
 ) -> Tuple[gym.Env, mbrl.types.TermFnType, Optional[mbrl.types.RewardFnType]]:
     if "gym___" in env_name:
         import mbrl.env
 
         env = gym.make(env_name.split("___")[1])
-        term_fn = getattr(mbrl.env.termination_fns,
-                          cfg.lifelong_learning.overrides.term_fn)
-        if hasattr(cfg.lifelong_learning.overrides, "reward_fn"
-                   ) and cfg.lifelong_learning.overrides.reward_fn is not None:
-            reward_fn = getattr(mbrl.env.reward_fns,
-                                cfg.lifelong_learning.overrides.reward_fn)
+        term_fn = getattr(mbrl.env.termination_fns, cfg.overrides.term_fn)
+        if hasattr(cfg.overrides,
+                   "reward_fn") and cfg.overrides.reward_fn is not None:
+            reward_fn = getattr(mbrl.env.reward_fns, cfg.overrides.reward_fn)
         else:
-            reward_fn = getattr(mbrl.env.reward_fns,
-                                cfg.lifelong_learning.overrides.term_fn, None)
+            reward_fn = getattr(mbrl.env.reward_fns, cfg.overrides.term_fn,
+                                None)
     else:
         import mbrl.env.mujoco_envs
 
@@ -45,7 +48,8 @@ def make_env(
         elif env_name == "pets_halfcheetah":
             env = mbrl.env.mujoco_envs.HalfCheetahEnv()
             term_fn = mbrl.env.termination_fns.no_termination
-            reward_fn = getattr(mbrl.env.reward_fns, "halfcheetah", None)
+            # reward_fn = getattr(mbrl.env.reward_fns, "halfcheetah", None)
+            reward_fn = DOMAIN_TO_REWARD_FUNCTION[env_cfg.reward_fn](env)
         elif env_name == "pets_reacher":
             env = mbrl.env.mujoco_envs.Reacher3DEnv()
             term_fn = mbrl.env.termination_fns.no_termination
@@ -64,15 +68,13 @@ def make_env(
             reward_fn = None
         else:
             raise ValueError("Invalid environment string.")
-        env = gym.wrappers.TimeLimit(
-            env,
-            max_episode_steps=cfg.overrides.lifelong_learning.get(
-                "trial_length", 1000))
+        env = gym.wrappers.TimeLimit(env,
+                                     max_episode_steps=cfg.overrides.get(
+                                         "trial_length", 1000))
     for wrapper_name in wrappers:
         env = hydra.utils.instantiate(wrapper_name, env=env)
 
-    learned_rewards = cfg.overrides.lifelong_learning.get(
-        "learned_rewards", True)
+    learned_rewards = cfg.overrides.get("learned_rewards", True)
     if learned_rewards:
         reward_fn = None
 
@@ -91,17 +93,31 @@ def run(cfg: omegaconf.DictConfig):
     lifelong_learning_task_names = []
     lifelong_learning_termination_fns = []
     lifelong_learning_reward_fns = []
-    num_tasks = len(cfg.overrides.lifelong_learning.envs)
-    for i, env_cfg in enumerate(cfg.overrides.lifelong_learning.envs):
+    print('[main_lifelong_learning] cfg: ', cfg)
+
+    # num_tasks = len(cfg.overrides.envs)
+
+    for i, env_cfg in enumerate(cfg.overrides.envs):
         print('[main_lifelong_learning:94] wrappers: ', env_cfg.wrappers)
-        env, term_fn, reward_fn = make_env(
-            env_cfg.env_name, env_cfg.wrappers,
-            cfg.overrides.lifelong_learning.learned_rewards, cfg)
-        env = MultitaskWrapper(env, i, num_tasks)
+        env, term_fn, reward_fn = make_env(env_cfg.env_name, env_cfg.wrappers,
+                                           cfg.overrides.learned_rewards, cfg,
+                                           env_cfg)
+        # env = MultitaskWrapper(env, i, num_tasks)
         lifelong_learning_envs.append(env)
         lifelong_learning_task_names.append(env_cfg.task_name)
         lifelong_learning_termination_fns.append(term_fn)
         lifelong_learning_reward_fns.append(reward_fn)
+
+    task_name_to_task_index = make_task_name_to_index_map(
+        lifelong_learning_task_names)
+    num_tasks = len(task_name_to_task_index.keys())
+    lifelong_learning_envs = lifelong_learning_envs[:num_tasks]
+    lifelong_learning_termination_fns = (
+        lifelong_learning_termination_fns[:num_tasks])
+    lifelong_learning_reward_fns = lifelong_learning_reward_fns[:num_tasks]
+    for i in range(len(lifelong_learning_envs)):
+        lifelong_learning_envs[i] = MultitaskWrapper(lifelong_learning_envs[i],
+                                                     i, num_tasks)
 
     print(
         f'[main_lifelong_learning:97] lifelong_learning_envs: {lifelong_learning_envs}'
@@ -112,10 +128,13 @@ def run(cfg: omegaconf.DictConfig):
     print(
         f'[main_lifelong_learning:102] lifelong_learning_reward_fns: {lifelong_learning_reward_fns}'
     )
-    # np.random.seed(cfg.seed)
-    # torch.manual_seed(cfg.seed)
-    # if cfg.algorithm.name == "pets":
-    #     return pets.train(env, term_fn, reward_fn, cfg)
+    np.random.seed(cfg.seed)
+    torch.manual_seed(cfg.seed)
+    if cfg.algorithm.name == "pets":
+        return lifelong_learning_pets.train(
+            lifelong_learning_envs, lifelong_learning_task_names,
+            lifelong_learning_termination_fns, lifelong_learning_reward_fns,
+            lifelong_learning_termination_fns[0], cfg)
     # if cfg.algorithm.name == "mbpo":
     #     test_env, *_ = mujoco_util.make_env(cfg)
     #     return mbpo.train(env, test_env, term_fn, cfg)

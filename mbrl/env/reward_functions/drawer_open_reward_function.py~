@@ -1,0 +1,18 @@
+from .base_reward_function import BaseRewardFunction
+import tensorflow as tf
+from .metaworld_reward_utils import tolerance
+
+
+class DrawerOpenRewardFunction(BaseRewardFunction):
+    OBS_DIM = 39
+
+    def get_reward(self, observation: tf.Tensor, action: tf.Tensor):
+        gripper = obs[:3]
+        handle = obs[4:7]
+
+        handle_error = tf.norm(handle - self._env._target_pos)
+
+        reward_for_opening = tolerance(handle_error,
+                                       bounds=(0, 0.02),
+                                       margin=self._env.maxDist,
+                                       sigmoid='long_tail')

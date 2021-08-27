@@ -1,0 +1,27 @@
+from abc import ABCMeta, abstractmethod
+import tensorflow as tf
+
+
+class BaseRewardFunction(metaclass=ABCMeta):
+    def __init__(self, environment):
+        self._env = environment
+
+    @property
+    @abstractmethod
+    def OBS_DIM(self):
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_reward(self, observation: tf.Tensor, action: tf.Tensor):
+        raise NotImplementedError
+
+    def __call__(self, raw_observations: tf.Tensor, actions: tf.Tensor):
+        # Get rid of one-hot encoding of the task.
+        observations = raw_observations[:, :self.OBS_DIM]
+        rewards = self.get_reward(observations, actions)
+        return rewards
+        # rewards = tf.TensorArray(tf.float32, size=observations.shape[0])
+        # for i in tf.range(observations.shape[0]):
+        #    rewards = rewards.write(
+        #        i, self.get_reward(observations[i], actions[i]))
+        # return rewards.stack()

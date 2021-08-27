@@ -1,0 +1,102 @@
+from typing import Callable, Dict, List, Tuple
+from .base_reward_function import BaseRewardFunction
+from .drawer_close_reward_function import DrawerCloseRewardFunction
+from .drawer_open_reward_function import DrawerOpenRewardFunction
+from .faucet_close_reward_function import FaucetCloseRewardFunction
+from .faucet_open_reward_function import FaucetOpenRewardFunction
+from .reacher_3d_reward_function import Reacher3DRewardFunction
+from .half_cheetah_reward_function import HalfCheetahRewardFunction
+from .half_cheetah_backwards_reward_function import (
+    HalfCheetahBackwardsRewardFunction)
+from .half_cheetah_jump_reward_function import HalfCheetahJumpRewardFunction
+from .reach_reward_function import ReachRewardFunction
+import tensorflow as tf
+
+
+class PrefixDict(dict):
+    def __getitem__(self, arg):
+        matches = []
+        for key, value in dict.items(self):
+            if arg.startswith(key):
+                matches.append((key, value))
+        if len(matches) == 0:
+            raise ValueError('Key not found.')
+        longest_match_key, longest_match_value = matches[0]
+        for key, value in matches:
+            if len(key) > len(longest_match_key):
+                longest_match_key, longest_match_value = key, value
+        return longest_match_value
+
+
+DOMAIN_TO_REWARD_FUNCTION = PrefixDict({
+    'drawer-close-v2':
+    DrawerCloseRewardFunction,
+    'drawer-close-v2-max':
+    DrawerCloseRewardFunction,
+    'drawer-open-v2':
+    DrawerOpenRewardFunction,
+    'drawer-open-v2-max':
+    DrawerOpenRewardFunction,
+    'faucet-close-v2':
+    FaucetCloseRewardFunction,
+    'faucet-open-v2':
+    FaucetOpenRewardFunction,
+    'MBRLReacher3D':
+    Reacher3DRewardFunction,
+    'MBRLReacher5Goals3D':
+    Reacher3DRewardFunction,
+    'reach-v2':
+    ReachRewardFunction,
+    'MBRLHalfCheetah':
+    HalfCheetahRewardFunction,
+    'MBRLHalfCheetah-halfCheetah_backwards':
+    HalfCheetahBackwardsRewardFunction,
+    'MBRLHalfCheetah-jump':
+    HalfCheetahJumpRewardFunction,
+})
+
+
+def get_task_indices_from_observations(observations: tf.Tensor,
+                                       num_tasks: int) -> tf.Tensor:
+    one_hot_task_encodings = observations[:, -num_tasks:]
+    task_indices = tf.squeeze(tf.argmax(one_hot_task_encodings,
+                                        axis=1))  # Shape: [bs]
+    return task_indices
+
+
+def separate_observations_and_task_ids(
+        original_observations: tf.Tensor,
+        num_tasks: int) -> Tuple[tf.Tensor, tf.Tensor]:
+    return (original_observations[..., :-num_tasks],
+            original_observations[..., -num_tasks:])
+
+
+def general_reward_function(
+        observations: tf.Tensor, actions: tf.Tensor,
+        list_of_reward_functions: List[BaseRewardFunction]):
+    #def reward_function(obs, act):
+    #    batch_size = obs.shape[0]
+    #    rewards = tf.TensorArray(tf.float32, size=batch_size)
+    #    for i in tf.range(batch_size):
+    #        observation = obs[i]
+    #        one_hot_task_encoding = observation[-len(list_of_reward_functions
+    #                                                 ):]
+    #        task_index = tf.math.argmax(one_hot_task_encoding)
+    #        rewards = rewards.write(
+    #            i, list_of_reward_functions[task_index](observation, act[i]))
+    #    return rewards.stack()
+
+    #rew = tf.py_function(func=reward_function,
+    #                     inp=[observations, actions],
+    #                     Tout=tf.float32)
+    #rew.set_shape([observations.shape[0], 1])
+
+    rewards = tf.TensorArray(tf.float32, size=len(list_of_reward_functions))
+    for i, reward_function in enumerate(list_of_reward_functions):
+        rewards = rewards.write(i, reward_function(observations, actions))
+    rewards = rewards.stack()  # Shape: [n, bs]
+    task_indices = get_task_indices_from_observations(
+        observations, len(list_of_reward_functions))
+    rewards = tf.transpose(rewards, [1, 0])  # Shape: [bs, n]
+    rewards = tf.gather(rewards, task_indices, batch_dims=1)
+    return rewards

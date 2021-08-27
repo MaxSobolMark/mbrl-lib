@@ -41,44 +41,58 @@ class LifelongLearningModel():  # Model):
         self,
         model: Model,
         num_tasks: int,
+        obs_shape: Tuple[int, ...],
+        act_shape: Tuple[int, ...],
         observe_task_id: bool = False,
         forward_postprocess_fn: Callable[[
             torch.Tensor, torch.Tensor, torch.Tensor, torch.nn.parameter.
             Parameter
-        ], Tuple[torch.Tensor, torch.Tensor]] = None,
+        ], Tuple[torch.Tensor, torch.Tensor]] = lambda inputs, mean, logvar:
+        (mean, logvar),
     ):
         super().__init__()
         self._model = model
         self._num_tasks = num_tasks
+        self._obs_shape = obs_shape
+        self._act_shape = act_shape
         self._observe_task_id = observe_task_id
         self._forward_postprocess_fn = forward_postprocess_fn
         self.device = model.device
         self._original_forward = self._model.model.forward
         self._model.model.forward = self.forward
+        # Make the dimensions of the task ID not delta.
+        # Extend the no_delta_list with -1, -2, -3, ..., -self._num_tasks.
+        print('self._model.no_delta_list: ', self._model.no_delta_list)
+        print('asdasd: ', list(range(-1, -self._num_tasks - 1, -1)))
+        self._model.no_delta_list.extend(
+            list(range(-1, -self._num_tasks - 1, -1)))
 
     def forward(self, x: torch.Tensor, **kwargs) -> Tuple[torch.Tensor, ...]:
         """Calls forward method of base model with the given input and args."""
         original_inputs = x
         # if not self._observe_task_id:
+        # x contains the observations and the actions
+        observations = x[..., :-np.prod(self._act_shape)]
         if self._num_tasks > 1:
-            x, task_ids = separate_observations_and_task_ids(
-                x, self._num_tasks)
-            assert torch.equal(task_ids.min(), torch.zeros(1).to(self.device))
-            assert torch.equal(task_ids.max(), torch.ones(1).to(self.device))
-            assert torch.logical_or(
-                task_ids.eq(torch.ones_like(task_ids).to(self.device)),
-                task_ids.eq(torch.zeros_like(task_ids).to(self.device)))
+            observations, task_ids = separate_observations_and_task_ids(
+                observations, self._num_tasks)
+            assert task_ids.min() == 0., f'task_ids.min(): {task_ids.min()}'
+            assert task_ids.max() == 1., f'task_ids.max(): {task_ids.max()}'
+            assert torch.all(
+                torch.logical_or(
+                    task_ids.eq(torch.ones_like(task_ids).to(self.device)),
+                    task_ids.eq(torch.zeros_like(task_ids).to(self.device))))
             if self._observe_task_id:
-                x = torch.cat([x, task_ids], dim=-1)
+                observations = torch.cat([observations, task_ids], dim=-1)
+        x[..., :-np.prod(self._act_shape)] = observations
         mean, logvar = self._original_forward(x, **kwargs)
         if self._num_tasks > 1:
             mean[..., -self._num_tasks:] = task_ids.detach()
-            logvar[..., -self._num_tasks:] = (
-                torch.ones_like(task_ids) *
-                self._model.model.min_logvar).detach()
-
-        mean, logvar = self._forward_postprocess_fn(
-            original_inputs, mean, logvar, self._model.model.min_logvar)
+            logvar[..., -self._num_tasks:] = (torch.ones_like(task_ids) *
+                                              -float('inf')).detach()
+        if self._forward_postprocess_fn is not None:
+            mean, logvar = self._forward_postprocess_fn(
+                original_inputs, mean, logvar, self._model.model.min_logvar)
         return mean, logvar
 
     def __len__(self, *args, **kwargs):

@@ -1,0 +1,13 @@
+from .base_reward_function import BaseRewardFunction
+import tensorflow as tf
+import numpy as np
+
+
+class HalfCheetahBackwardsRewardFunction(BaseRewardFunction):
+    OBS_DIM = 18
+
+    def get_reward(self, observation: tf.Tensor, action: tf.Tensor):
+        reward_ctrl = -0.1 * tf.math.reduce_sum(tf.math.square(action),
+                                                axis=-1)
+        reward_run = -observation[:, 0]
+        return reward_run + reward_ctrl

@@ -20,8 +20,9 @@ import mbrl.planning
 import mbrl.types
 import mbrl.util
 import mbrl.util.common
-from mbrl.util.lifelong_learning import (make_task_name_to_index_map,
-                                         general_reward_function)
+from mbrl.util.lifelong_learning import (
+    make_task_name_to_index_map, general_reward_function,
+    train_lifelong_learning_model_and_save_model_and_data)
 import mbrl.util.math
 
 EVAL_LOG_FORMAT = mbrl.constants.EVAL_LOG_FORMAT
@@ -74,12 +75,19 @@ def train(
     num_tasks = len(task_name_to_task_index.keys())
     dynamics_model = mbrl.util.common.create_one_dim_tr_model(
         cfg, obs_shape, act_shape)
+    print('[lifelong_learning_pets:78] forw_postproc: ',
+          cfg.overrides.forward_postprocess_fn)
+    if cfg.overrides.forward_postprocess_fn != 'None':
+        forward_postprocess_fn = cfg.overrides.forward_postprocess_fn
+    else:
+        forward_postprocess_fn = None
     dynamics_model = LifelongLearningModel(
         dynamics_model,
         num_tasks,
-        observe_task_id=cfg.overrides.lifelong_learning.observe_task_id,
-        forward_postprocess_fn=cfg.overrides.lifelong_learning.
-        forward_postprocess_fn,
+        obs_shape,
+        act_shape,
+        observe_task_id=cfg.overrides.observe_task_id,
+        forward_postprocess_fn=forward_postprocess_fn,
     )
     use_double_dtype = cfg.algorithm.get("normalize_double_precision", False)
     dtype = np.double if use_double_dtype else np.float32
@@ -105,7 +113,9 @@ def train(
 
     # ---------------------------------------------------------
     # ---------- Create model environment and agent -----------
-    reward_function = partial(general_reward_function, num_tasks=num_tasks)
+    reward_function = partial(
+        general_reward_function,
+        list_of_reward_functions=lifelong_learning_reward_fns)
     model_env = mbrl.models.ModelEnv(lifelong_learning_envs[0],
                                      dynamics_model,
                                      termination_fn,
@@ -130,7 +140,7 @@ def train(
     max_total_reward = -np.inf
     while env_steps < cfg.overrides.num_steps:
         for i in range(cfg.overrides.num_steps //
-                       lifelong_learning_task_names):
+                       len(lifelong_learning_task_names)):
             task_i = task_name_to_task_index[lifelong_learning_task_names[i]]
             obs = lifelong_learning_envs[task_i].reset()
             agent.reset()
@@ -140,7 +150,7 @@ def train(
             while not done:
                 # --------------- Model Training -----------------
                 if env_steps % cfg.algorithm.freq_train_model == 0:
-                    mbrl.util.common.train_lifelong_learning_model_and_save_model_and_data(
+                    train_lifelong_learning_model_and_save_model_and_data(
                         dynamics_model,
                         model_trainer,
                         cfg.overrides,
@@ -149,6 +159,7 @@ def train(
                     )
 
                 # --- Doing env step using the agent and adding to model dataset ---
+                print('test')
                 next_obs, reward, done, _ = mbrl.util.common.step_env_and_add_to_buffer(
                     lifelong_learning_envs[task_i], obs, agent, {},
                     task_replay_buffers[task_i])

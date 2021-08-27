@@ -97,8 +97,7 @@ def create_one_dim_tr_model(
         target_is_delta=cfg.algorithm.target_is_delta,
         normalize=cfg.algorithm.normalize,
         normalize_double_precision=cfg.algorithm.get(
-            "normalize_double_precision", False
-        ),
+            "normalize_double_precision", False),
         learned_rewards=cfg.algorithm.learned_rewards,
         obs_process_fn=obs_process_fn,
         no_delta_list=cfg.overrides.get("no_delta_list", None),
@@ -110,7 +109,8 @@ def create_one_dim_tr_model(
     return dynamics_model
 
 
-def load_hydra_cfg(results_dir: Union[str, pathlib.Path]) -> omegaconf.DictConfig:
+def load_hydra_cfg(
+        results_dir: Union[str, pathlib.Path]) -> omegaconf.DictConfig:
     """Loads a Hydra configuration from the given directory path.
 
     Tries to load the configuration from "results_dir/.hydra/config.yaml".
@@ -174,18 +174,15 @@ def create_replay_buffer(
     Returns:
         (:class:`mbrl.replay_buffer.ReplayBuffer`): the replay buffer.
     """
-    dataset_size = (
-        cfg.algorithm.get("dataset_size", None) if "algorithm" in cfg else None
-    )
+    dataset_size = (cfg.algorithm.get("dataset_size", None)
+                    if "algorithm" in cfg else None)
     if not dataset_size:
         dataset_size = cfg.overrides.num_steps
     maybe_max_trajectory_len = None
     if collect_trajectories:
         if cfg.overrides.trial_length is None:
-            raise ValueError(
-                "cfg.overrides.trial_length must be set when "
-                "collect_trajectories==True."
-            )
+            raise ValueError("cfg.overrides.trial_length must be set when "
+                             "collect_trajectories==True.")
         maybe_max_trajectory_len = cfg.overrides.trial_length
 
     replay_buffer = ReplayBuffer(
@@ -213,6 +210,8 @@ def get_basic_buffer_iterators(
     ensemble_size: int = 1,
     shuffle_each_epoch: bool = True,
     bootstrap_permutes: bool = False,
+    data: Optional[mbrl.types.TransitionBatch] = None,
+        rng: Optional[np.random.Generator] = None,
 ) -> Tuple[TransitionIterator, Optional[TransitionIterator]]:
     """Returns training/validation iterators for the data in the replay buffer.
 
@@ -234,25 +233,29 @@ def get_basic_buffer_iterators(
         (tuple of :class:`mbrl.replay_buffer.TransitionIterator`): the training
         and validation iterators, respectively.
     """
-    data = replay_buffer.get_all(shuffle=True)
-    val_size = int(replay_buffer.num_stored * val_ratio)
-    train_size = replay_buffer.num_stored - val_size
+    if data is None:
+        data = replay_buffer.get_all(shuffle=True)
+    val_size = int(len(data) *
+                   val_ratio)  # int(replay_buffer.num_stored * val_ratio)
+    train_size = len(data) - val_size  # replay_buffer.num_stored - val_size
     train_data = data[:train_size]
+    rng = rng if rng is not None else replay_buffer.rng
     train_iter = BootstrapIterator(
         train_data,
         batch_size,
         ensemble_size,
         shuffle_each_epoch=shuffle_each_epoch,
         permute_indices=bootstrap_permutes,
-        rng=replay_buffer.rng,
+        rng=rng,
     )
 
     val_iter = None
     if val_size > 0:
         val_data = data[train_size:]
-        val_iter = TransitionIterator(
-            val_data, batch_size, shuffle_each_epoch=False, rng=replay_buffer.rng
-        )
+        val_iter = TransitionIterator(val_data,
+                                      batch_size,
+                                      shuffle_each_epoch=False,
+                                      rng=replay_buffer.rng)
 
     return train_iter, val_iter
 
@@ -293,14 +296,14 @@ def get_sequence_buffer_iterator(
     assert replay_buffer.stores_trajectories, (
         "The passed replay buffer does not store trajectory information. "
         "Make sure that the replay buffer is created with the max_trajectory_length "
-        "parameter set."
-    )
+        "parameter set.")
 
     transitions = replay_buffer.get_all()
     num_trajectories = len(replay_buffer.trajectory_indices)
     val_size = int(num_trajectories * val_ratio)
     train_size = num_trajectories - val_size
-    all_trajectories = replay_buffer.rng.permutation(replay_buffer.trajectory_indices)
+    all_trajectories = replay_buffer.rng.permutation(
+        replay_buffer.trajectory_indices)
     train_trajectories = all_trajectories[:train_size]
 
     train_iterator = SequenceTransitionIterator(
@@ -415,12 +418,13 @@ def rollout_model_env(
     reward_history = []
     if agent:
         plan = agent.plan(initial_obs[None, :])
-    obs0 = model_env.reset(np.tile(initial_obs, (num_samples, 1)), return_as_np=True)
+    obs0 = model_env.reset(np.tile(initial_obs, (num_samples, 1)),
+                           return_as_np=True)
     obs_history.append(obs0)
     for action in plan:
-        next_obs, reward, done, _ = model_env.step(
-            np.tile(action, (num_samples, 1)), sample=False
-        )
+        next_obs, reward, done, _ = model_env.step(np.tile(
+            action, (num_samples, 1)),
+                                                   sample=False)
         obs_history.append(next_obs)
         reward_history.append(reward)
     return np.stack(obs_history), np.stack(reward_history), plan
@@ -462,17 +466,13 @@ def rollout_agent_trajectories(
     Returns:
         (list(float)): Total rewards obtained at each complete trial.
     """
-    if (
-        replay_buffer is not None
-        and replay_buffer.stores_trajectories
-        and not collect_full_trajectories
-    ):
+    if (replay_buffer is not None and replay_buffer.stores_trajectories
+            and not collect_full_trajectories):
         # Might be better as a warning but it's possible that users will miss it.
         raise RuntimeError(
             "Replay buffer is tracking trajectory information but "
             "collect_trajectories is set to False, which will result in "
-            "corrupted trajectory data."
-        )
+            "corrupted trajectory data.")
 
     step = 0
     trial = 0

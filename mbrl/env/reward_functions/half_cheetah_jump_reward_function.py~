@@ -1,0 +1,19 @@
+from .base_reward_function import BaseRewardFunction
+import tensorflow as tf
+import numpy as np
+
+
+class HalfCheetahJumpRewardFunction(BaseRewardFunction):
+    OBS_DIM = 18
+
+    def __init__(self, env):
+        super(HalfCheetahJumpRewardFunction, self).__init__(env)
+        self._z_init = self._env.unwrapped.sim.data.qpos[1]
+
+    def get_reward(self, observation: tf.Tensor, action: tf.Tensor):
+        reward_ctrl = -0.1 * tf.math.reduce_sum(tf.math.square(action),
+                                                axis=-1)
+        reward_run = observation[:, 0]
+        z = observation[:, 1]
+        reward_jump = 15 * tf.maximum(z - self._z_init, 0)
+        return reward_run + reward_ctrl + reward_jump

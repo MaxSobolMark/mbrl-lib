@@ -1,0 +1,10 @@
+from .base_reward_function import BaseRewardFunction
+import tensorflow as tf
+
+
+class DoorOpenRewardFunction(BaseRewardFunction):
+    OBS_DIM = 39
+
+    def __call__(self, raw_observations: tf.Tensor, actions: tf.Tensor):
+        # Get rid of one-hot encoding of the task.
+        observations = raw_observations[:, :OBS_DIM]
