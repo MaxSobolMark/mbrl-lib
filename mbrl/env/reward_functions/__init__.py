@@ -9,6 +9,8 @@ from .half_cheetah_reward_function import HalfCheetahRewardFunction
 from .half_cheetah_backwards_reward_function import (
     HalfCheetahBackwardsRewardFunction)
 from .half_cheetah_jump_reward_function import HalfCheetahJumpRewardFunction
+
+from mbrl.env.reward_fns import reacher
 # from .reach_reward_function import ReachRewardFunction
 # import tensorflow as tf
 
@@ -28,7 +30,8 @@ class PrefixDict(dict):
         return longest_match_value
 
 
-DOMAIN_TO_REWARD_FUNCTION = PrefixDict({
+# DOMAIN_TO_REWARD_FUNCTION = PrefixDict({
+DOMAIN_TO_REWARD_FUNCTION = {  # PrefixDict({
     # 'drawer-close-v2':
     # DrawerCloseRewardFunction,
     # 'drawer-close-v2-max':
@@ -41,16 +44,18 @@ DOMAIN_TO_REWARD_FUNCTION = PrefixDict({
     # FaucetCloseRewardFunction,
     # 'faucet-open-v2':
     # FaucetOpenRewardFunction,
-    # 'pets_reacher':
-    # Reacher3DRewardFunction,
+    'pets_reacher':
+    reacher,
+    #Reacher3DRewardFunction,
     # 'MBRLReacher5Goals3D':
     # Reacher3DRewardFunction,
     # 'reach-v2':
     # ReachRewardFunction,
     'pets_halfcheetah':
     HalfCheetahRewardFunction,
-    'pets_halfCheetah_backwards':
+    'pets_halfcheetah_backwards':
     HalfCheetahBackwardsRewardFunction,
     'pets_halfcheetah_jump':
     HalfCheetahJumpRewardFunction,
-})
+    }
+# })

@@ -1,5 +1,12 @@
 # @package _group_
 env: "pets_reacher"
+envs:
+  -
+    env_name: "pets_reacher"
+    wrappers: []
+    task_name: "forward"
+    reward_fn: "pets_reacher"
+
 learned_rewards: false
 reward_fn: "reacher"
 num_steps: 15000
@@ -21,5 +28,7 @@ cem_elite_ratio: 0.1
 cem_population_size: 400  # 350
 cem_alpha: 0.1
 
+# Dynamics model config
+observe_task_id: true
 forward_postprocess_fn:
   _target_: mbrl.env.pets_reacher

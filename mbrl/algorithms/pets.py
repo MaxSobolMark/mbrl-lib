@@ -3,7 +3,10 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 import os
-from typing import Callable, Optional, Tuple
+from typing import Optional, List
+from enum import Enum
+import gtimer as gt
+from functools import partial
 
 import gym
 import numpy as np
@@ -16,6 +19,9 @@ import mbrl.planning
 import mbrl.types
 import mbrl.util
 import mbrl.util.common
+from mbrl.util.lifelong_learning import (
+    make_task_name_to_index_map, general_reward_function,
+    train_lifelong_learning_model_and_save_model_and_data)
 import mbrl.util.math
 
 EVAL_LOG_FORMAT = mbrl.constants.EVAL_LOG_FORMAT

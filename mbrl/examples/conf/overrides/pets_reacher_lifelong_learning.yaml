@@ -1,0 +1,99 @@
+# @package _group_
+env: "pets_reacher"
+envs:
+  -
+    env_name: "pets_reacher"
+    wrappers: []
+    task_name: "task_0"
+    reward_fn: "pets_reacher"
+    env_kwargs:
+      task_id: 0
+  -
+    env_name: "pets_reacher"
+    wrappers: []
+    task_name: "task_1"
+    reward_fn: "pets_reacher"
+    env_kwargs:
+      task_id: 1
+  -
+    env_name: "pets_reacher"
+    wrappers: []
+    task_name: "task_2"
+    reward_fn: "pets_reacher"
+    env_kwargs:
+      task_id: 2
+  -
+    env_name: "pets_reacher"
+    wrappers: []
+    task_name: "task_3"
+    reward_fn: "pets_reacher"
+    env_kwargs:
+      task_id: 3
+  -
+    env_name: "pets_reacher"
+    wrappers: []
+    task_name: "task_4"
+    reward_fn: "pets_reacher"
+    env_kwargs:
+      task_id: 4
+  -
+    env_name: "pets_reacher"
+    wrappers: []
+    task_name: "task_5"
+    reward_fn: "pets_reacher"
+    env_kwargs:
+      task_id: 5
+  -
+    env_name: "pets_reacher"
+    wrappers: []
+    task_name: "task_6"
+    reward_fn: "pets_reacher"
+    env_kwargs:
+      task_id: 6
+  -
+    env_name: "pets_reacher"
+    wrappers: []
+    task_name: "task_7"
+    reward_fn: "pets_reacher"
+    env_kwargs:
+      task_id: 7
+  -
+    env_name: "pets_reacher"
+    wrappers: []
+    task_name: "task_8"
+    reward_fn: "pets_reacher"
+    env_kwargs:
+      task_id: 8
+  -
+    env_name: "pets_reacher"
+    wrappers: []
+    task_name: "task_9"
+    reward_fn: "pets_reacher"
+    env_kwargs:
+      task_id: 9
+
+learned_rewards: false
+reward_fn: "reacher"
+num_steps: 15000
+trial_length: 150  # 1000
+
+num_elites: 5
+model_lr: 0.00075  # 4e-4
+model_wd: 0  # 1.7e-4
+model_batch_size: 32
+validation_ratio: 0.  # 0.05
+no_delta_list: [7, 8, 9]  # [ 0 ]
+freq_train_model: 150  # 250
+patience: 5  # 25
+num_epochs_train_model: 5  # 25
+
+planning_horizon: 15
+cem_num_iters: 5
+cem_elite_ratio: 0.1
+cem_population_size: 400  # 350
+cem_alpha: 0.1
+
+# Dynamics model config
+observe_task_id: true
+forward_postprocess_fn:
+  _target_: mbrl.env.pets_reacher

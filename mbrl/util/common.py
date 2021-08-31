@@ -4,6 +4,7 @@
 # LICENSE file in the root directory of this source tree.
 import pathlib
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
+import gtimer as gt
 
 import gym.wrappers
 import hydra
@@ -211,7 +212,7 @@ def get_basic_buffer_iterators(
     shuffle_each_epoch: bool = True,
     bootstrap_permutes: bool = False,
     data: Optional[mbrl.types.TransitionBatch] = None,
-        rng: Optional[np.random.Generator] = None,
+    rng: Optional[np.random.Generator] = None,
 ) -> Tuple[TransitionIterator, Optional[TransitionIterator]]:
     """Returns training/validation iterators for the data in the replay buffer.
 
@@ -514,6 +515,7 @@ def rollout_agent_trajectories(
     return total_rewards
 
 
+@gt.wrap
 def step_env_and_add_to_buffer(
     env: gym.Env,
     obs: np.ndarray,
@@ -540,8 +542,11 @@ def step_env_and_add_to_buffer(
         `env.step(agent.act(obs))`.
     """
     action = agent.act(obs, **agent_kwargs)
+    gt.stamp('agent.act')
     next_obs, reward, done, info = env.step(action)
+    gt.stamp('env.step')
     replay_buffer.add(obs, action, next_obs, reward, done)
     if callback:
         callback((obs, action, next_obs, reward, done))
+    gt.stamp('callback')
     return next_obs, reward, done, info

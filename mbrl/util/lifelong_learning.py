@@ -36,15 +36,18 @@ def separate_observations_and_task_ids(
 
 
 def general_reward_function(
-        actions: torch.Tensor, observations: torch.Tensor,
-        list_of_reward_functions: List[RewardFnType]) -> torch.Tensor:
+    actions: torch.Tensor,
+    observations: torch.Tensor,
+    list_of_reward_functions: List[RewardFnType],
+    device: str,
+) -> torch.Tensor:
     obs, task_ids = separate_observations_and_task_ids(
         observations, num_tasks=len(list_of_reward_functions))
     task_ids = task_ids.argmax(dim=-1)
-    all_rewards = torch.full([obs.shape[0], 1], -float('inf'))
+    all_rewards = torch.full([obs.shape[0], 1], -float('inf')).to(device)
     for i, reward_function in enumerate(list_of_reward_functions):
         indices = (task_ids == i).nonzero(as_tuple=True)
-        rewards = reward_function(actions[indices], obs[indices])
+        rewards = reward_function(actions[indices], obs[indices], device)
         all_rewards[indices] = rewards
     assert (all_rewards == -float('inf')).sum() == 0
     return all_rewards

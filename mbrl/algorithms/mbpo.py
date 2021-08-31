@@ -16,6 +16,7 @@ import mbrl.models
 import mbrl.planning
 import mbrl.third_party.pytorch_sac as pytorch_sac
 import mbrl.types
+from mbrl.types import TransitionBatch
 import mbrl.util
 import mbrl.util.common
 import mbrl.util.math
@@ -28,16 +29,16 @@ MBPO_LOG_FORMAT = mbrl.constants.EVAL_LOG_FORMAT + [
 
 
 def rollout_model_and_populate_sac_buffer(
-    model_env: mbrl.models.ModelEnv,
-    replay_buffer: mbrl.util.ReplayBuffer,
-    agent: SACAgent,
-    sac_buffer: pytorch_sac.ReplayBuffer,
-    sac_samples_action: bool,
-    rollout_horizon: int,
-    batch_size: int,
-):
-
-    batch = replay_buffer.sample(batch_size)
+        model_env: mbrl.models.ModelEnv,
+        replay_buffer: mbrl.util.ReplayBuffer,
+        agent: SACAgent,
+        sac_buffer: pytorch_sac.ReplayBuffer,
+        sac_samples_action: bool,
+        rollout_horizon: int,
+        batch_size: int,
+        batch: TransitionBatch = None):
+    if batch is None:
+        batch = replay_buffer.sample(batch_size)
     initial_obs, *_ = cast(mbrl.types.TransitionBatch, batch).astuple()
     obs = model_env.reset(
         initial_obs_batch=cast(np.ndarray, initial_obs),
@@ -46,7 +47,8 @@ def rollout_model_and_populate_sac_buffer(
     accum_dones = np.zeros(obs.shape[0], dtype=bool)
     for i in range(rollout_horizon):
         action = agent.act(obs, sample=sac_samples_action, batched=True)
-        pred_next_obs, pred_rewards, pred_dones, _ = model_env.step(action, sample=True)
+        pred_next_obs, pred_rewards, pred_dones, _ = model_env.step(
+            action, sample=True)
         sac_buffer.add_batch(
             obs[~accum_dones],
             action[~accum_dones],
@@ -88,9 +90,8 @@ def maybe_replace_sac_buffer(
     device: torch.device,
 ) -> pytorch_sac.ReplayBuffer:
     if sac_buffer is None or new_capacity != sac_buffer.capacity:
-        new_buffer = pytorch_sac.ReplayBuffer(
-            obs_shape, act_shape, new_capacity, device
-        )
+        new_buffer = pytorch_sac.ReplayBuffer(obs_shape, act_shape,
+                                              new_capacity, device)
         if sac_buffer is None:
             return new_buffer
         n = len(sac_buffer)
@@ -133,7 +134,8 @@ def train(
         dump_frequency=1,
     )
     save_video = cfg.get("save_video", False)
-    video_recorder = pytorch_sac.VideoRecorder(work_dir if save_video else None)
+    video_recorder = pytorch_sac.VideoRecorder(
+        work_dir if save_video else None)
 
     rng = np.random.default_rng(seed=cfg.seed)
     torch_generator = torch.Generator(device=cfg.device)
@@ -141,7 +143,8 @@ def train(
         torch_generator.manual_seed(cfg.seed)
 
     # -------------- Create initial overrides. dataset --------------
-    dynamics_model = mbrl.util.common.create_one_dim_tr_model(cfg, obs_shape, act_shape)
+    dynamics_model = mbrl.util.common.create_one_dim_tr_model(
+        cfg, obs_shape, act_shape)
     use_double_dtype = cfg.algorithm.get("normalize_double_precision", False)
     dtype = np.double if use_double_dtype else np.float32
     replay_buffer = mbrl.util.common.create_replay_buffer(
@@ -158,23 +161,26 @@ def train(
         env,
         cfg.algorithm.initial_exploration_steps,
         mbrl.planning.RandomAgent(env) if random_explore else agent,
-        {} if random_explore else {"sample": True, "batched": False},
+        {} if random_explore else {
+            "sample": True,
+            "batched": False
+        },
         replay_buffer=replay_buffer,
     )
 
     # ---------------------------------------------------------
     # --------------------- Training Loop ---------------------
-    rollout_batch_size = (
-        cfg.overrides.effective_model_rollouts_per_step * cfg.algorithm.freq_train_model
-    )
+    rollout_batch_size = (cfg.overrides.effective_model_rollouts_per_step *
+                          cfg.algorithm.freq_train_model)
     trains_per_epoch = int(
-        np.ceil(cfg.overrides.epoch_length / cfg.overrides.freq_train_model)
-    )
+        np.ceil(cfg.overrides.epoch_length / cfg.overrides.freq_train_model))
     updates_made = 0
     env_steps = 0
-    model_env = mbrl.models.ModelEnv(
-        env, dynamics_model, termination_fn, None, generator=torch_generator
-    )
+    model_env = mbrl.models.ModelEnv(env,
+                                     dynamics_model,
+                                     termination_fn,
+                                     None,
+                                     generator=torch_generator)
     model_trainer = mbrl.models.ModelTrainer(
         dynamics_model,
         optim_lr=cfg.overrides.model_lr,
@@ -186,10 +192,8 @@ def train(
     sac_buffer = None
     while env_steps < cfg.overrides.num_steps:
         rollout_length = int(
-            mbrl.util.math.truncated_linear(
-                *(cfg.overrides.rollout_schedule + [epoch + 1])
-            )
-        )
+            mbrl.util.math.truncated_linear(*(cfg.overrides.rollout_schedule +
+                                              [epoch + 1])))
         sac_buffer_capacity = rollout_length * rollout_batch_size * trains_per_epoch
         sac_buffer_capacity *= cfg.overrides.num_epochs_to_retain_sac_buffer
         sac_buffer = maybe_replace_sac_buffer(
@@ -205,8 +209,7 @@ def train(
                 obs, done = env.reset(), False
             # --- Doing env step and adding to model dataset ---
             next_obs, reward, done, _ = mbrl.util.common.step_env_and_add_to_buffer(
-                env, obs, agent, {}, replay_buffer
-            )
+                env, obs, agent, {}, replay_buffer)
 
             # --------------- Model Training -----------------
             if (env_steps + 1) % cfg.overrides.freq_train_model == 0:
@@ -231,18 +234,16 @@ def train(
                 )
 
                 if debug_mode:
-                    print(
-                        f"Epoch: {epoch}. "
-                        f"SAC buffer size: {len(sac_buffer)}. "
-                        f"Rollout length: {rollout_length}. "
-                        f"Steps: {env_steps}"
-                    )
+                    print(f"Epoch: {epoch}. "
+                          f"SAC buffer size: {len(sac_buffer)}. "
+                          f"Rollout length: {rollout_length}. "
+                          f"Steps: {env_steps}")
 
             # --------------- Agent Training -----------------
             for _ in range(cfg.overrides.num_sac_updates_per_step):
-                if (env_steps + 1) % cfg.overrides.sac_updates_every_steps != 0 or len(
-                    sac_buffer
-                ) < rollout_batch_size:
+                if (env_steps +
+                        1) % cfg.overrides.sac_updates_every_steps != 0 or len(
+                            sac_buffer) < rollout_batch_size:
                     break  # only update every once in a while
                 agent.update(sac_buffer, logger, updates_made)
                 updates_made += 1
@@ -251,9 +252,9 @@ def train(
 
             # ------ Epoch ended (evaluate and save model) ------
             if (env_steps + 1) % cfg.overrides.epoch_length == 0:
-                avg_reward = evaluate(
-                    test_env, agent, cfg.algorithm.num_eval_episodes, video_recorder
-                )
+                avg_reward = evaluate(test_env, agent,
+                                      cfg.algorithm.num_eval_episodes,
+                                      video_recorder)
                 logger.log_data(
                     mbrl.constants.RESULTS_LOG_NAME,
                     {
@@ -266,12 +267,10 @@ def train(
                 if avg_reward > best_eval_reward:
                     video_recorder.save(f"{epoch}.mp4")
                     best_eval_reward = avg_reward
-                    torch.save(
-                        agent.critic.state_dict(), os.path.join(work_dir, "critic.pth")
-                    )
-                    torch.save(
-                        agent.actor.state_dict(), os.path.join(work_dir, "actor.pth")
-                    )
+                    torch.save(agent.critic.state_dict(),
+                               os.path.join(work_dir, "critic.pth"))
+                    torch.save(agent.actor.state_dict(),
+                               os.path.join(work_dir, "actor.pth"))
                 epoch += 1
 
             env_steps += 1

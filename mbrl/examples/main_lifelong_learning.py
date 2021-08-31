@@ -13,6 +13,7 @@ import wandb
 
 # import mbrl.algorithms.mbpo as mbpo
 import mbrl.algorithms.lifelong_learning_pets as lifelong_learning_pets
+import mbrl.algorithms.fsrl as fsrl
 import mbrl.util.mujoco as mujoco_util
 import mbrl.types
 from mbrl.env.wrappers.multitask_wrapper import MultitaskWrapper
@@ -49,9 +50,13 @@ def make_env(
             env = mbrl.env.mujoco_envs.HalfCheetahEnv()
             term_fn = mbrl.env.termination_fns.no_termination
             # reward_fn = getattr(mbrl.env.reward_fns, "halfcheetah", None)
+            print('------------------------------------')
+            print('[main_lifelong_learning:54] env_cfg: ', env_cfg)
             reward_fn = DOMAIN_TO_REWARD_FUNCTION[env_cfg.reward_fn](env)
+            print('[main_lifelong_learning:56] reward_fn: ', reward_fn)
+            print('------------------------------------')
         elif env_name == "pets_reacher":
-            env = mbrl.env.mujoco_envs.Reacher3DEnv()
+            env = mbrl.env.mujoco_envs.Reacher3DEnv(**env_cfg.env_kwargs)
             term_fn = mbrl.env.termination_fns.no_termination
             reward_fn = getattr(mbrl.env.reward_fns, 'reacher', None)
         elif env_name == "pets_pusher":
@@ -132,12 +137,28 @@ def run(cfg: omegaconf.DictConfig):
     torch.manual_seed(cfg.seed)
     if cfg.algorithm.name == "pets":
         return lifelong_learning_pets.train(
-            lifelong_learning_envs, lifelong_learning_task_names,
-            lifelong_learning_termination_fns, lifelong_learning_reward_fns,
-            lifelong_learning_termination_fns[0], cfg)
+            lifelong_learning_envs,
+            lifelong_learning_task_names,
+            lifelong_learning_termination_fns,
+            lifelong_learning_reward_fns,
+            lifelong_learning_termination_fns[0],
+            cfg,
+            forward_postprocess_fn=getattr(lifelong_learning_envs[0],
+                                           'forward_postprocess_fn', None))
     # if cfg.algorithm.name == "mbpo":
     #     test_env, *_ = mujoco_util.make_env(cfg)
     #     return mbpo.train(env, test_env, term_fn, cfg)
+    if cfg.algorithm.name == "fsrl":
+        fsrl.train(
+            lifelong_learning_envs,
+            [],  # TODO: ADD EVALUATION ENVIRONMENTS
+            lifelong_learning_task_names,
+            lifelong_learning_termination_fns,
+            lifelong_learning_reward_fns,
+            lifelong_learning_termination_fns[0],
+            fsrl.PolicyType(cfg.algorithm.policy_to_use.upper()),
+            cfg,
+        )
 
 
 if __name__ == "__main__":

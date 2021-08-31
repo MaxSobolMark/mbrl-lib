@@ -11,7 +11,6 @@ from mbrl.third_party.pytorch_sac.agent import Agent
 
 class SACAgent(Agent):
     """SAC algorithm."""
-
     def __init__(
         self,
         obs_dim,
@@ -47,7 +46,8 @@ class SACAgent(Agent):
         self.learnable_temperature = learnable_temperature
 
         self.critic = hydra.utils.instantiate(critic_cfg).to(self.device)
-        self.critic_target = hydra.utils.instantiate(critic_cfg).to(self.device)
+        self.critic_target = hydra.utils.instantiate(critic_cfg).to(
+            self.device)
         self.critic_target.load_state_dict(self.critic.state_dict())
 
         self.actor = hydra.utils.instantiate(actor_cfg).to(self.device)
@@ -58,17 +58,17 @@ class SACAgent(Agent):
         self.target_entropy = target_entropy if target_entropy else -action_dim
 
         # optimizers
-        self.actor_optimizer = torch.optim.Adam(
-            self.actor.parameters(), lr=actor_lr, betas=actor_betas
-        )
+        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(),
+                                                lr=actor_lr,
+                                                betas=actor_betas)
 
-        self.critic_optimizer = torch.optim.Adam(
-            self.critic.parameters(), lr=critic_lr, betas=critic_betas
-        )
+        self.critic_optimizer = torch.optim.Adam(self.critic.parameters(),
+                                                 lr=critic_lr,
+                                                 betas=critic_betas)
 
-        self.log_alpha_optimizer = torch.optim.Adam(
-            [self.log_alpha], lr=alpha_lr, betas=alpha_betas
-        )
+        self.log_alpha_optimizer = torch.optim.Adam([self.log_alpha],
+                                                    lr=alpha_lr,
+                                                    betas=alpha_betas)
 
         self.train()
         self.critic_target.train()
@@ -95,20 +95,21 @@ class SACAgent(Agent):
         assert action.ndim == 2
         return utils.to_np(action)
 
-    def update_critic(self, obs, action, reward, next_obs, not_done, logger, step):
+    def update_critic(self, obs, action, reward, next_obs, not_done, logger,
+                      step):
         dist = self.actor(next_obs)
         next_action = dist.rsample()
         log_prob = dist.log_prob(next_action).sum(-1, keepdim=True)
         target_Q1, target_Q2 = self.critic_target(next_obs, next_action)
-        target_V = torch.min(target_Q1, target_Q2) - self.alpha.detach() * log_prob
+        target_V = torch.min(target_Q1,
+                             target_Q2) - self.alpha.detach() * log_prob
         target_Q = reward + (not_done * self.discount * target_V)
         target_Q = target_Q.detach()
 
         # get current Q estimates
         current_Q1, current_Q2 = self.critic(obs, action)
         critic_loss = F.mse_loss(current_Q1, target_Q) + F.mse_loss(
-            current_Q2, target_Q
-        )
+            current_Q2, target_Q)
         logger.log("train_critic/loss", critic_loss, step)
 
         # Optimize the critic
@@ -140,9 +141,8 @@ class SACAgent(Agent):
 
         if self.learnable_temperature:
             self.log_alpha_optimizer.zero_grad()
-            alpha_loss = (
-                self.alpha * (-log_prob - self.target_entropy).detach()
-            ).mean()
+            alpha_loss = (self.alpha *
+                          (-log_prob - self.target_entropy).detach()).mean()
             logger.log("train_alpha/loss", alpha_loss, step)
             logger.log("train_alpha/value", self.alpha, step)
             alpha_loss.backward()
@@ -150,18 +150,19 @@ class SACAgent(Agent):
 
     def update(self, replay_buffer, logger, step):
         obs, action, reward, next_obs, not_done, not_done_no_max = replay_buffer.sample(
-            self.batch_size
-        )
+            self.batch_size)
 
         logger.log("train/batch_reward", reward.mean(), step)
 
-        self.update_critic(obs, action, reward, next_obs, not_done_no_max, logger, step)
+        self.update_critic(obs, action, reward, next_obs, not_done_no_max,
+                           logger, step)
 
         if step % self.actor_update_frequency == 0:
             self.update_actor_and_alpha(obs, logger, step)
 
         if step % self.critic_target_update_frequency == 0:
-            utils.soft_update_params(self.critic, self.critic_target, self.critic_tau)
+            utils.soft_update_params(self.critic, self.critic_target,
+                                     self.critic_tau)
 
     def save(self, save_dir):
         critic_path = save_dir / "critic.pth"

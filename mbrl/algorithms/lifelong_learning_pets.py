@@ -3,7 +3,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 import os
-from typing import Optional, List
+from typing import Callable, Optional, List, Tuple
 from enum import Enum
 import gtimer as gt
 from functools import partial
@@ -27,6 +27,14 @@ import mbrl.util.math
 
 EVAL_LOG_FORMAT = mbrl.constants.EVAL_LOG_FORMAT
 
+TIMES_LOG_FORMAT = [
+    ('initialization', 'i', 'float'),
+    ('train_model', 't', 'float'),
+    ('step_env', 's_e', 'float'),
+    ('finished_step', 'f_s', 'float'),
+    ('finished_task', 'f_t', 'float'),
+]
+
 
 class PolicyType(Enum):
     EXPLICIT_POLICY = 'EXPLICIT_POLICY'
@@ -46,6 +54,9 @@ def train(
     cfg: omegaconf.DictConfig,
     silent: bool = False,
     work_dir: Optional[str] = None,
+    forward_postprocess_fn: Callable[[
+        torch.Tensor, torch.Tensor, torch.Tensor, torch.nn.parameter.Parameter
+    ], Tuple[torch.Tensor, torch.Tensor]] = None,
 ) -> np.float32:
     # ------------------- Initialization -------------------
     debug_mode = cfg.get("debug_mode", False)
@@ -68,6 +79,10 @@ def train(
         logger.register_group(mbrl.constants.RESULTS_LOG_NAME,
                               EVAL_LOG_FORMAT,
                               color="green")
+        logger.register_group('times', TIMES_LOG_FORMAT)
+    gt.reset_root()
+    gt.rename_root('lifelong_learning_pets')
+    gt.set_def_unique(False)
 
     # -------- Create and populate initial env dataset --------
     task_name_to_task_index = make_task_name_to_index_map(
@@ -75,12 +90,12 @@ def train(
     num_tasks = len(task_name_to_task_index.keys())
     dynamics_model = mbrl.util.common.create_one_dim_tr_model(
         cfg, obs_shape, act_shape)
-    print('[lifelong_learning_pets:78] forw_postproc: ',
-          cfg.overrides.forward_postprocess_fn)
-    if cfg.overrides.forward_postprocess_fn != 'None':
-        forward_postprocess_fn = cfg.overrides.forward_postprocess_fn
-    else:
-        forward_postprocess_fn = None
+    # print('[lifelong_learning_pets:78] forw_postproc: ',
+    #       cfg.overrides.forward_postprocess_fn)
+    # if cfg.overrides.forward_postprocess_fn != 'None':
+    #     forward_postprocess_fn = cfg.overrides.forward_postprocess_fn
+    # else:
+    #     forward_postprocess_fn = None
     dynamics_model = LifelongLearningModel(
         dynamics_model,
         num_tasks,
@@ -115,7 +130,10 @@ def train(
     # ---------- Create model environment and agent -----------
     reward_function = partial(
         general_reward_function,
-        list_of_reward_functions=lifelong_learning_reward_fns)
+        list_of_reward_functions=lifelong_learning_reward_fns,
+        device=cfg.device)
+    print('[lifelong_learning_pets:135] lifelong_learning_reward_fns: ',
+          lifelong_learning_reward_fns)
     model_env = mbrl.models.ModelEnv(lifelong_learning_envs[0],
                                      dynamics_model,
                                      termination_fn,
@@ -132,22 +150,32 @@ def train(
         model_env,
         cfg.algorithm.agent,
         num_particles=cfg.algorithm.num_particles)
+    gt.stamp('initialization')
 
     # ---------------------------------------------------------
     # --------------------- Training Loop ---------------------
     env_steps = 0
     current_trial = 0
     max_total_reward = -np.inf
-    while env_steps < cfg.overrides.num_steps:
-        for i in range(cfg.overrides.num_steps //
-                       len(lifelong_learning_task_names)):
+    # loop = gt.timed_loop('training_loop')
+    # while env_steps < cfg.overrides.num_steps:
+    # next(loop)
+    # task_loop = gt.timed_loop('task_loop')
+    for i in range(len(lifelong_learning_task_names)):
+        env_steps_this_task = 0
+        while env_steps_this_task < cfg.overrides.num_steps // len(
+                lifelong_learning_task_names):
+
+            # next(task_loop)
             task_i = task_name_to_task_index[lifelong_learning_task_names[i]]
             obs = lifelong_learning_envs[task_i].reset()
             agent.reset()
             done = False
             total_reward = 0.0
             steps_trial = 0
+            #episode_loop = gt.timed_loop('episode_loop')
             while not done:
+                # next(episode_loop)
                 # --------------- Model Training -----------------
                 if env_steps % cfg.algorithm.freq_train_model == 0:
                     train_lifelong_learning_model_and_save_model_and_data(
@@ -157,33 +185,61 @@ def train(
                         task_replay_buffers,
                         work_dir=work_dir,
                     )
+                    gt.stamp('train_model')
 
                 # --- Doing env step using the agent and adding to model dataset ---
-                print('test')
+                print('[lifelong_learning_pets:189] task_i: ', task_i)
+                print('[lifelong_learning_pets:190] obs: ', obs)
+                model_env.reset(np.tile(np.reshape(obs, [1, -1]), [5, 1]),
+                                return_as_np=False)
+                imagined_obs, _, _, _ = model_env.step(np.tile(
+                    np.reshape(
+                        lifelong_learning_envs[task_i].action_space.sample(),
+                        [1, -1]), [5, 1]),
+                                                       sample=False)
+                print('[lifelong_learning_pets:195] imagined_obs: ',
+                      imagined_obs[0])
                 next_obs, reward, done, _ = mbrl.util.common.step_env_and_add_to_buffer(
                     lifelong_learning_envs[task_i], obs, agent, {},
                     task_replay_buffers[task_i])
+                gt.stamp('step_env')
 
                 obs = next_obs
                 total_reward += reward
                 steps_trial += 1
                 env_steps += 1
+                env_steps_this_task += 1
 
                 if debug_mode:
                     print(f"Step {env_steps}: Reward {reward:.3f}.")
+                    # print(gt.report())
+                # gt.stamp('episode_loop')
+
+            #episode_loop.exit()
 
             if logger is not None:
+                time_diagnostics = {
+                    key: times[-1]
+                    for key, times in gt.get_times().stamps.itrs.items()
+                }
                 logger.log_data(
                     mbrl.constants.RESULTS_LOG_NAME,
                     {
                         "env_step": env_steps,
-                        "episode_reward": total_reward
+                        "episode_reward": total_reward,
+                        "task_index": task_i,
                     },
                 )
+                logger.log_data('times', time_diagnostics)
+                print(gt.report(include_itrs=False))
             current_trial += 1
             if debug_mode:
                 print(f"Trial: {current_trial }, reward: {total_reward}.")
 
             max_total_reward = max(max_total_reward, total_reward)
-
+            gt.stamp('finished_step')
+        # task_loop.exit()
+        gt.stamp('finished_task')
+    # loop.exit()
+    print(gt.report(include_itrs=False))
     return np.float32(max_total_reward)

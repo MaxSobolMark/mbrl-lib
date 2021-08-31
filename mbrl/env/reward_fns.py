@@ -44,7 +44,9 @@ def pusher(act: torch.Tensor, next_obs: torch.Tensor) -> torch.Tensor:
     return -(obs_cost + act_cost).view(-1, 1)
 
 
-def reacher(act: torch.Tensor, next_obs: torch.Tensor) -> torch.Tensor:
+def reacher(act: torch.Tensor,
+            next_obs: torch.Tensor,
+            device: str = '') -> torch.Tensor:
     assert len(next_obs.shape) == len(act.shape) == 2
     # print('[reward_fns:49] next_obs.shape: ', next_obs.shape)
     goals = next_obs[:, 7:10]

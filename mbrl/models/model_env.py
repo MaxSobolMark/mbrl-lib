@@ -3,12 +3,14 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 from typing import Dict, Optional, Tuple
+import gtimer as gt
 
 import gym
 import numpy as np
 import torch
 
 import mbrl.types
+# from mbrl.planning.core import Agent
 
 from . import one_dim_tr_model
 
@@ -86,6 +88,7 @@ class ModelEnv:
             return self._current_obs.cpu().numpy()
         return self._current_obs
 
+    @gt.wrap
     def step(
         self,
         actions: mbrl.types.TensorType,
@@ -117,9 +120,12 @@ class ModelEnv:
                 deterministic=not sample,
                 rng=self._rng,
             )
+            gt.stamp('sample')
             rewards = (pred_rewards if self.reward_fn is None else
                        self.reward_fn(actions, next_observs))
+            gt.stamp('reward_function')
             dones = self.termination_fn(actions, next_observs)
+            gt.stamp('termination_fn')
             self._current_obs = next_observs
             if self._return_as_np:
                 next_observs = next_observs.cpu().numpy()
@@ -170,5 +176,30 @@ class ModelEnv:
             terminated |= dones
             total_rewards += rewards
 
+        total_rewards = total_rewards.reshape(-1, num_particles)
+        return total_rewards.mean(dim=1)
+
+    def evaluate_agent(
+        self,
+        agent,  #: Agent,
+        initial_state: np.ndarray,
+        horizon: int,
+        num_particles: int,
+    ) -> torch.Tensor:
+        print('[model_env:189] initial state:', initial_state)
+        print('[model_env:190] num_particles:', num_particles)
+        initial_obs_batch = np.tile(initial_state,
+                                    (num_particles, 1)).astype(np.float32)
+        self.reset(initial_obs_batch, return_as_np=False)
+        batch_size = initial_obs_batch.shape[0]
+        total_rewards = torch.zeros(batch_size, 1).to(self.device)
+        terminated = torch.zeros(batch_size, 1, dtype=bool).to(self.device)
+        obs = torch.Tensor(initial_obs_batch)
+        for time_step in range(horizon):
+            actions_for_step = agent.act(obs.to('cpu'), batched=True)
+            obs, rewards, dones, _ = self.step(actions_for_step, sample=True)
+            rewards[terminated] = 0
+            terminated |= dones
+            total_rewards += rewards
         total_rewards = total_rewards.reshape(-1, num_particles)
         return total_rewards.mean(dim=1)

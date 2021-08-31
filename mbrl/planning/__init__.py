@@ -10,15 +10,10 @@ from .trajectory_opt import (
     TrajectoryOptimizerAgent,
     create_trajectory_optim_agent_for_model,
 )
+from .combined_agent import CombinedAgent
 
 __all__ = [
-    "Agent",
-    "CEMOptimizer",
-    "MPPIOptimizer",
-    "RandomAgent",
-    "TrajectoryOptimizer",
-    "TrajectoryOptimizerAgent",
-    "complete_agent_cfg",
-    "create_trajectory_optim_agent_for_model",
-    "load_agent",
+    "Agent", "CEMOptimizer", "MPPIOptimizer", "RandomAgent",
+    "TrajectoryOptimizer", "TrajectoryOptimizerAgent", "complete_agent_cfg",
+    "create_trajectory_optim_agent_for_model", "load_agent", "CombinedAgent"
 ]

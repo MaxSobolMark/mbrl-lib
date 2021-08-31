@@ -2,24 +2,29 @@ import os
 from typing import Tuple
 
 import numpy as np
+from numpy.random import MT19937, RandomState, SeedSequence
 import torch
 from gym import utils
 from gym.envs.mujoco import mujoco_env
 
 
 class Reacher3DEnv(mujoco_env.MujocoEnv, utils.EzPickle):
-    def __init__(self):
+    def __init__(self, task_id=None):
         self.viewer = None
         utils.EzPickle.__init__(self)
         dir_path = os.path.dirname(os.path.realpath(__file__))
         self.goal = np.zeros(3)
         mujoco_env.MujocoEnv.__init__(
             self, os.path.join(dir_path, "assets/reacher3d.xml"), 2)
+        self._task_id = task_id
+        if task_id is not None:
+            self._rng = RandomState(MT19937(SeedSequence(task_id)))
+            self.goal = self._rng.normal(loc=0, scale=0.1, size=[3])
 
     def step(self, a):
         self.do_simulation(a, self.frame_skip)
         ob = self._get_obs()
-        print('[pets_reacher:22] ob[7:10]: ', ob[7:10])
+        # print('[pets_reacher:22] ob[7:10]: ', ob[7:10])
         reward = -np.sum(
             np.square(Reacher3DEnv.get_EE_pos(ob[None]) - self.goal))
         reward -= 0.01 * np.square(a).sum()
@@ -34,9 +39,12 @@ class Reacher3DEnv(mujoco_env.MujocoEnv, utils.EzPickle):
 
     def reset_model(self):
         qpos, qvel = np.copy(self.init_qpos), np.copy(self.init_qvel)
-        qpos[-3:] += np.random.normal(loc=0, scale=0.1, size=[3])
+        if self._task_id is not None:
+            qpos[-3:] += self.goal
+        else:
+            qpos[-3:] += np.random.normal(loc=0, scale=0.1, size=[3])
+            self.goal = qpos[-3:]
         qvel[-3:] = 0
-        self.goal = qpos[-3:]
         self.set_state(qpos, qvel)
         return self._get_obs()
 

@@ -7,6 +7,7 @@ import pickle
 import warnings
 from typing import Callable, List, Optional, Sequence, Tuple, Union
 import hydra
+import gtimer as gt
 
 import numpy as np
 import torch
@@ -67,6 +68,7 @@ class LifelongLearningModel():  # Model):
         self._model.no_delta_list.extend(
             list(range(-1, -self._num_tasks - 1, -1)))
 
+    @gt.wrap
     def forward(self, x: torch.Tensor, **kwargs) -> Tuple[torch.Tensor, ...]:
         """Calls forward method of base model with the given input and args."""
         original_inputs = x
@@ -85,7 +87,9 @@ class LifelongLearningModel():  # Model):
             if self._observe_task_id:
                 observations = torch.cat([observations, task_ids], dim=-1)
         x[..., :-np.prod(self._act_shape)] = observations
+        gt.stamp('forward_preprocessing')
         mean, logvar = self._original_forward(x, **kwargs)
+        gt.stamp('original_forward')
         if self._num_tasks > 1:
             mean[..., -self._num_tasks:] = task_ids.detach()
             logvar[..., -self._num_tasks:] = (torch.ones_like(task_ids) *
@@ -93,6 +97,8 @@ class LifelongLearningModel():  # Model):
         if self._forward_postprocess_fn is not None:
             mean, logvar = self._forward_postprocess_fn(
                 original_inputs, mean, logvar, self._model.model.min_logvar)
+        gt.stamp('forward_postprocessing')
+
         return mean, logvar
 
     def __len__(self, *args, **kwargs):
