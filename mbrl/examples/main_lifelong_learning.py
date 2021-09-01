@@ -56,7 +56,8 @@ def make_env(
             print('[main_lifelong_learning:56] reward_fn: ', reward_fn)
             print('------------------------------------')
         elif env_name == "pets_reacher":
-            env = mbrl.env.mujoco_envs.Reacher3DEnv(**env_cfg.env_kwargs)
+            env_kwargs = env_cfg.get('env_kwargs', {})
+            env = mbrl.env.mujoco_envs.Reacher3DEnv(**env_kwargs)
             term_fn = mbrl.env.termination_fns.no_termination
             reward_fn = getattr(mbrl.env.reward_fns, 'reacher', None)
         elif env_name == "pets_pusher":
