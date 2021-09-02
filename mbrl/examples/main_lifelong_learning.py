@@ -157,7 +157,7 @@ def run(cfg: omegaconf.DictConfig):
             lifelong_learning_termination_fns,
             lifelong_learning_reward_fns,
             lifelong_learning_termination_fns[0],
-            fsrl.PolicyType(cfg.algorithm.policy_to_use.upper()),
+            fsrl.PolicyType(cfg.overrides.policy_to_use.upper()),
             cfg,
         )
 

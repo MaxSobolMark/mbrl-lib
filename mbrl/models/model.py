@@ -350,4 +350,6 @@ class Ensemble(Model, abc.ABC):
         means, logvars = self.forward(x, rng=rng)
         variances = logvars.exp()
         stds = torch.sqrt(variances)
+        stds = torch.nn.functional.softplus(stds)
+        assert torch.all(stds >= 0), stds
         return (torch.normal(means, stds, generator=rng), )

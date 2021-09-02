@@ -298,6 +298,7 @@ def train(
                         "env_step": env_steps,
                         "episode_reward": total_reward,
                         "rollout_length": rollout_length,
+                        "task_index": task_i,
                     },
                 )
             for i, test_env in enumerate(evaluation_environments):
