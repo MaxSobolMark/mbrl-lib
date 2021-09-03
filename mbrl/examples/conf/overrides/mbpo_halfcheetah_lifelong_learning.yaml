@@ -50,7 +50,7 @@ num_elites: 5
 model_lr: 0.001  # 2e-4
 model_wd: 0.00002
 model_batch_size: 256
-validation_ratio: 0.2
+validation_ratio: 0  # 0.2
 no_delta_list: [ 0 ]
 freq_train_model: 250
 effective_model_rollouts_per_step: 400

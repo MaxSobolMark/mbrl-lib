@@ -26,6 +26,9 @@ class CombinedAgent(Agent):
         self._cfg = cfg
         self._policy_to_use_current_epoch = None
 
+    def get_active_policy(self):
+        return 1 if self._policy_to_use_current_epoch == 'planner' else 0
+
     def act(self,
             obs: np.ndarray,
             current_task_index: int,

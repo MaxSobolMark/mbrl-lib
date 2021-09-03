@@ -159,7 +159,8 @@ def run(cfg: omegaconf.DictConfig):
             lifelong_learning_termination_fns[0],
             fsrl.PolicyType(cfg.overrides.policy_to_use.upper()),
             cfg,
-        )
+            forward_postprocess_fn=getattr(lifelong_learning_envs[0],
+                                           'forward_postprocess_fn', None))
 
 
 if __name__ == "__main__":

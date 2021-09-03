@@ -3,7 +3,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 import os
-from typing import Optional, List
+from typing import Callable, Optional, List, Tuple
 from enum import Enum
 import gtimer as gt
 from functools import partial
@@ -54,6 +54,9 @@ def train(
     cfg: omegaconf.DictConfig,
     silent: bool = False,
     work_dir: Optional[str] = None,
+    forward_postprocess_fn: Callable[[
+        torch.Tensor, torch.Tensor, torch.Tensor, torch.nn.parameter.Parameter
+    ], Tuple[torch.Tensor, torch.Tensor]] = None,
 ) -> np.float32:
     # ------------------- Initialization -------------------
     debug_mode = cfg.get("debug_mode", False)
@@ -97,10 +100,10 @@ def train(
         cfg, obs_shape, act_shape)
     print('[lifelong_learning_pets:78] forw_postproc: ',
           cfg.overrides.forward_postprocess_fn)
-    if cfg.overrides.forward_postprocess_fn != 'None':
-        forward_postprocess_fn = cfg.overrides.forward_postprocess_fn
-    else:
-        forward_postprocess_fn = None
+    # if cfg.overrides.forward_postprocess_fn != 'None':
+    #     forward_postprocess_fn = cfg.overrides.forward_postprocess_fn
+    # else:
+    #     forward_postprocess_fn = None
     dynamics_model = LifelongLearningModel(
         dynamics_model,
         num_tasks,
@@ -284,6 +287,7 @@ def train(
                 total_reward += reward
                 steps_trial += 1
                 env_steps += 1
+                env_steps_this_task += 1
 
                 if debug_mode:
                     print(f"Step {env_steps}: Reward {reward:.3f}.")
@@ -291,6 +295,12 @@ def train(
             # Episode finished
             # TODO: add support for early termination.
             if logger is not None:
+                if policy_to_use == PolicyType.COMBINED:
+                    active_policy = agent.get_active_policy()
+                elif policy_to_use == PolicyType.CEM_PLANNING:
+                    active_policy = 1
+                else:
+                    active_policy = 0
                 logger.log_data(
                     mbrl.constants.RESULTS_LOG_NAME,
                     {
@@ -299,6 +309,7 @@ def train(
                         "episode_reward": total_reward,
                         "rollout_length": rollout_length,
                         "task_index": task_i,
+                        'active_policy'
                     },
                 )
             for i, test_env in enumerate(evaluation_environments):
