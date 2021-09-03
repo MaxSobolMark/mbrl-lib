@@ -378,6 +378,7 @@ class GaussianMLP(Ensemble):
             raise ValueError(
                 "To use GaussianMLP's ensemble propagation, the batch size must "
                 "be a multiple of the number of models in the ensemble."
+                "batch_size: " + str(batch_size) + "; model_len: " + str(model_len)
             )
         # rng causes segmentation fault, see https://github.com/pytorch/pytorch/issues/44714
         return torch.randperm(batch_size, device=self.device)

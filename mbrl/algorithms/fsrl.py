@@ -250,11 +250,20 @@ def train(
 
                 # Rollout model and store imagined trajectories for MBPO.
                 # TODO!!!!: make replay buffer sample equally from all tasks.
+                num_active_buffers = len(active_task_buffers)
                 real_batches_for_rollout = [
                     replay_buffer.sample(mbpo_rollout_batch_size //
-                                         len(active_task_buffers))
+                                         num_active_buffers)
                     for replay_buffer in active_task_buffers
                 ]
+                # mbpo_rollout_batch_size might not be divisible by the active buffers
+                # so get remaining samples
+                if mbpo_rollout_batch_size % num_active_buffers != 0:
+                    real_batches_for_rollout.append(
+                        task_replay_buffers[task_i].sample(
+                            mbpo_rollout_batch_size -
+                            mbpo_rollout_batch_size // num_active_buffers *
+                            num_active_buffers))
                 real_batches_for_rollout = (
                     mbrl.util.replay_buffer.concatenate_batches(
                         real_batches_for_rollout))
