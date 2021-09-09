@@ -14,10 +14,10 @@ class Reacher3DEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         utils.EzPickle.__init__(self)
         dir_path = os.path.dirname(os.path.realpath(__file__))
         self.goal = np.zeros(3)
+        self._hide_goal = hide_goal
         mujoco_env.MujocoEnv.__init__(
             self, os.path.join(dir_path, "assets/reacher3d.xml"), 2)
         self._task_id = task_id
-        self._hide_goal = hide_goal
         if task_id is not None:
             self._rng = RandomState(MT19937(SeedSequence(task_id)))
             self.goal = self._rng.normal(loc=0, scale=0.1, size=[3])
