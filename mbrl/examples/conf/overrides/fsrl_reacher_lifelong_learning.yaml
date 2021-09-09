@@ -8,6 +8,7 @@ envs:
     reward_fn: "pets_reacher"
     env_kwargs:
       task_id: 0
+      hide_goal: true
   -
     env_name: "pets_reacher"
     wrappers: []
@@ -15,6 +16,7 @@ envs:
     reward_fn: "pets_reacher"
     env_kwargs:
       task_id: 1
+      hide_goal: true
   -
     env_name: "pets_reacher"
     wrappers: []
@@ -22,6 +24,7 @@ envs:
     reward_fn: "pets_reacher"
     env_kwargs:
       task_id: 2
+      hide_goal: true
   -
     env_name: "pets_reacher"
     wrappers: []
@@ -29,6 +32,7 @@ envs:
     reward_fn: "pets_reacher"
     env_kwargs:
       task_id: 3
+      hide_goal: true
   -
     env_name: "pets_reacher"
     wrappers: []
@@ -36,6 +40,7 @@ envs:
     reward_fn: "pets_reacher"
     env_kwargs:
       task_id: 4
+      hide_goal: true
   -
     env_name: "pets_reacher"
     wrappers: []
@@ -43,6 +48,7 @@ envs:
     reward_fn: "pets_reacher"
     env_kwargs:
       task_id: 5
+      hide_goal: true
   -
     env_name: "pets_reacher"
     wrappers: []
@@ -50,6 +56,7 @@ envs:
     reward_fn: "pets_reacher"
     env_kwargs:
       task_id: 6
+      hide_goal: true
   -
     env_name: "pets_reacher"
     wrappers: []
@@ -57,6 +64,7 @@ envs:
     reward_fn: "pets_reacher"
     env_kwargs:
       task_id: 7
+      hide_goal: true
   -
     env_name: "pets_reacher"
     wrappers: []
@@ -64,6 +72,7 @@ envs:
     reward_fn: "pets_reacher"
     env_kwargs:
       task_id: 8
+      hide_goal: true
   -
     env_name: "pets_reacher"
     wrappers: []
@@ -71,6 +80,7 @@ envs:
     reward_fn: "pets_reacher"
     env_kwargs:
       task_id: 9
+      hide_goal: true
 
 term_fn: "no_termination"
 policy_to_use: "COMBINED"
@@ -115,3 +125,8 @@ sac_critic_lr: 0.00003
 sac_critic_target_update_frequency: 4
 sac_target_entropy: -3
 sac_hidden_depth: 2
+
+# Switching mechanism config
+# in ["last_n_episodes", "current_observation"]
+returns_expectation_calculation_method: "last_n_episodes"
+returns_expectation_n_episodes: 3

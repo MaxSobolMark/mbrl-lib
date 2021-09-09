@@ -92,7 +92,8 @@ class ModelEnv:
     def step(
         self,
         actions: mbrl.types.TensorType,
-        sample: bool = False
+        sample: bool = False,
+        mopo_penalty_coeff: float = 0.,
     ) -> Tuple[mbrl.types.TensorType, mbrl.types.TensorType, np.ndarray, Dict]:
         """Steps the model environment with the given batch of actions.
 
@@ -115,14 +116,23 @@ class ModelEnv:
                 actions = torch.from_numpy(actions).to(self.device)
             model_in = mbrl.types.TransitionBatch(self._current_obs, actions,
                                                   None, None, None)
-            next_observs, pred_rewards = self.dynamics_model.sample(
-                model_in,
-                deterministic=not sample,
-                rng=self._rng,
-            )
+            (next_observs,
+             pred_rewards), variances = self.dynamics_model.sample(
+                 model_in,
+                 deterministic=not sample,
+                 rng=self._rng,
+                 return_variance=True,
+             )
             gt.stamp('sample')
             rewards = (pred_rewards if self.reward_fn is None else
                        self.reward_fn(actions, next_observs))
+            if mopo_penalty_coeff != 0.:
+                stds = torch.sqrt(variances)
+                penalty = torch.max(torch.norm(stds, dim=-1), dim=0)
+                penalty = penalty[:, None]
+                assert penalty.shape == rewards.shape
+                unpenalized_rewards = rewards
+                rewards = rewards - mopo_penalty_coeff * penalty
             gt.stamp('reward_function')
             dones = self.termination_fn(actions, next_observs)
             gt.stamp('termination_fn')

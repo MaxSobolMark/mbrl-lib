@@ -262,6 +262,7 @@ class OneDTransitionRewardModel(Model):
         x: mbrl.types.TransitionBatch,
         deterministic: bool = False,
         rng: Optional[torch.Generator] = None,
+        return_variance: bool = False,
         **kwargs,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Samples next observations and rewards from the underlying model.
@@ -282,9 +283,15 @@ class OneDTransitionRewardModel(Model):
         actions = model_util.to_tensor(x.act).to(self.device)
 
         model_in = self._get_model_input_from_tensors(obs, actions)
-        preds = self.model.sample(model_in,
-                                  rng=rng,
-                                  deterministic=deterministic)[0]
+        if return_variance:
+            preds, variance = self.model.sample(model_in,
+                                                rng=rng,
+                                                deterministic=deterministic,
+                                                return_variance=True)
+        else:
+            preds = self.mode.sample(model_in,
+                                     rng=rng,
+                                     deterministic=deterministic)
         next_observs = preds[:, :-1] if self.learned_rewards else preds
         if self.target_is_delta:
             tmp_ = next_observs + obs
@@ -292,7 +299,9 @@ class OneDTransitionRewardModel(Model):
                 tmp_[:, dim] = next_observs[:, dim]
             next_observs = tmp_
         rewards = preds[:, -1:] if self.learned_rewards else None
-        return next_observs, rewards
+        if not return_variance:
+            return next_observs, rewards
+        return (next_observs, rewards), variance
 
     def reset(  # type: ignore
             self,

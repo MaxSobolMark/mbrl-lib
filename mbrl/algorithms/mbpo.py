@@ -29,14 +29,16 @@ MBPO_LOG_FORMAT = mbrl.constants.EVAL_LOG_FORMAT + [
 
 
 def rollout_model_and_populate_sac_buffer(
-        model_env: mbrl.models.ModelEnv,
-        replay_buffer: mbrl.util.ReplayBuffer,
-        agent: SACAgent,
-        sac_buffer: pytorch_sac.ReplayBuffer,
-        sac_samples_action: bool,
-        rollout_horizon: int,
-        batch_size: int,
-        batch: TransitionBatch = None):
+    model_env: mbrl.models.ModelEnv,
+    replay_buffer: mbrl.util.ReplayBuffer,
+    agent: SACAgent,
+    sac_buffer: pytorch_sac.ReplayBuffer,
+    sac_samples_action: bool,
+    rollout_horizon: int,
+    batch_size: int,
+    batch: TransitionBatch = None,
+    mopo_penalty_coeff: float = 0.,
+):
     if batch is None:
         batch = replay_buffer.sample(batch_size)
     initial_obs, *_ = cast(mbrl.types.TransitionBatch, batch).astuple()
@@ -48,7 +50,7 @@ def rollout_model_and_populate_sac_buffer(
     for i in range(rollout_horizon):
         action = agent.act(obs, sample=sac_samples_action, batched=True)
         pred_next_obs, pred_rewards, pred_dones, _ = model_env.step(
-            action, sample=True)
+            action, sample=True, mopo_penalty_coeff=mopo_penalty_coeff)
         sac_buffer.add_batch(
             obs[~accum_dones],
             action[~accum_dones],

@@ -48,6 +48,10 @@ def general_reward_function(
     for i, reward_function in enumerate(list_of_reward_functions):
         indices = (task_ids == i).nonzero(as_tuple=True)
         rewards = reward_function(actions[indices], obs[indices], device)
+        if (rewards == -float('inf')).sum() != 0:
+            print(
+                f'[lifelong_learning:52] there is a negative infinity in reward function [{i}]. rewards: {rewards}. rewards.min: {rewards.min()}'
+            )
         all_rewards[indices] = rewards
     assert (all_rewards == -float('inf')).sum() == 0
     return all_rewards

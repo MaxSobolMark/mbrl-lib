@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from typing import Tuple, Dict
 
 import omegaconf
 from mbrl.util.replay_buffer import ReplayBuffer
@@ -25,6 +26,7 @@ class CombinedAgent(Agent):
         self._model_env = model_env
         self._cfg = cfg
         self._policy_to_use_current_epoch = None
+        self._diagnostics = {}
 
     def get_active_policy(self):
         return 1 if self._policy_to_use_current_epoch == 'planner' else 0
@@ -50,6 +52,16 @@ class CombinedAgent(Agent):
             (np.ndarray): the action.
         """
         if timestep_in_epoch == 0:
+            print('[combined_agent:55] current_task_index: ',
+                  current_task_index)
+            returns_expectation_calculation_method = (
+                self._cfg.overrides.returns_expectation_calculation_method)
+            if returns_expectation_calculation_method == 'last_n_episodes':
+                last_n_trajectories = (
+                    current_task_replay_buffer.get_last_n_trajectories(
+                        self._cfg.overrides.returns_expectation_n_episodes))
+                if last_n_trajectories is not None:
+                    obs, *_ = last_n_trajectories.astuple()
             # task_episodes = current_task_replay_buffer.get_all()
             # TODO: DONT EVALUATE WITH EVERYTHING IN THE REPLAY BUFFER
             planner_action_sequence = self.planning_agent.plan(obs)[np.newaxis]
@@ -64,14 +76,23 @@ class CombinedAgent(Agent):
                 self.sac_agent, obs, self._cfg.overrides.planning_horizon,
                 self._cfg.algorithm.num_particles)
 
-            self._policy_to_use_current_epoch = 'planner' if planner_returns_expectation > explicit_policy_returns_expectation else 'explicit_policy'
+            self._policy_to_use_current_epoch = (
+                'planner' if planner_returns_expectation >
+                explicit_policy_returns_expectation else 'explicit_policy')
+            self._diagnostics = {
+                'planner_returns_expectation':
+                planner_returns_expectation,
+                'explicit_policy_returns_expectation':
+                explicit_policy_returns_expectation,
+            }
+
         if self._policy_to_use_current_epoch == 'planner':
             if return_plan:
                 return self.planning_agent.plan(obs, **kwargs)
             return self.planning_agent.act(obs, **kwargs)
         else:
             if return_plan:
-                return self.sac_agent.plan(obs, **kwargs)
+                self.sac_agent.plan(obs, **kwargs)
             return self.sac_agent.act(obs, **kwargs)
 
         # with pytorch_sac_utils.eval_mode(), torch.no_grad():
@@ -84,3 +105,6 @@ class CombinedAgent(Agent):
         self.sac_agent.reset()
         self.planning_agent.reset()
         self._policy_to_use_current_epoch = None
+
+    def get_episode_diagnostics(self) -> Dict[str, float]:
+        return self._diagnostics

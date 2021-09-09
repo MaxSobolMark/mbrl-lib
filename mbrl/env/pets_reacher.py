@@ -9,7 +9,7 @@ from gym.envs.mujoco import mujoco_env
 
 
 class Reacher3DEnv(mujoco_env.MujocoEnv, utils.EzPickle):
-    def __init__(self, task_id=None):
+    def __init__(self, task_id=None, hide_goal=False):
         self.viewer = None
         utils.EzPickle.__init__(self)
         dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -17,6 +17,7 @@ class Reacher3DEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         mujoco_env.MujocoEnv.__init__(
             self, os.path.join(dir_path, "assets/reacher3d.xml"), 2)
         self._task_id = task_id
+        self._hide_goal = hide_goal
         if task_id is not None:
             self._rng = RandomState(MT19937(SeedSequence(task_id)))
             self.goal = self._rng.normal(loc=0, scale=0.1, size=[3])
@@ -49,8 +50,13 @@ class Reacher3DEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         return self._get_obs()
 
     def _get_obs(self):
+        if not self._hide_goal:
+            return np.concatenate([
+                self.data.qpos.flat,
+                self.data.qvel.flat[:-3],
+            ])
         return np.concatenate([
-            self.data.qpos.flat,
+            self.data.qpos.flat[:-3],
             self.data.qvel.flat[:-3],
         ])
 

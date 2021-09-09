@@ -471,6 +471,17 @@ class ReplayBuffer:
                             self.trajectory_indices[idx][1])
         return self._batch_from_indices(indices)
 
+    def get_last_n_trajectories(self, n: int) -> Optional[TransitionBatch]:
+        if self.trajectory_indices is None or len(
+                self.trajectory_indices) == 0:
+            return None
+        indices = [
+            np.arange(trajectory_index[0], trajectory_index[1])
+            for trajectory_index in self.trajectory_indices[-n:]
+        ]
+        indices = np.concatenate(indices, axis=-1)
+        return self._batch_from_indices(indices)
+
     def _batch_from_indices(self, indices: Sized) -> TransitionBatch:
         obs = self.obs[indices]
         next_obs = self.next_obs[indices]

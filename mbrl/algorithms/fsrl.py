@@ -32,6 +32,10 @@ from .mbpo import (MBPO_LOG_FORMAT, rollout_model_and_populate_sac_buffer,
                    evaluate, maybe_replace_sac_buffer)
 
 EVAL_LOG_FORMAT = mbrl.constants.EVAL_LOG_FORMAT
+POLICY_DIAGNOSTICS_FORMAT = [
+    ('explicit_policy_returns_expectation', 'EP', 'float'),
+    ('planning_policy_returns_expectation', 'PP', 'float'),
+]
 
 
 class PolicyType(Enum):
@@ -79,6 +83,9 @@ def train(
         logger.register_group(mbrl.constants.RESULTS_LOG_NAME,
                               EVAL_LOG_FORMAT,
                               color="green")
+        logger.register_group('policy_diagnostics',
+                              POLICY_DIAGNOSTICS_FORMAT,
+                              color='red')
     gt.reset_root()
     gt.rename_root('lifelong_learning_pets')
     gt.set_def_unique(False)
@@ -321,6 +328,9 @@ def train(
                         'active_policy': active_policy,
                     },
                 )
+                if hasattr(agent, 'get_episode_diagnostics'):
+                    logger.log_data('policy_diagnostics',
+                                    agent.get_episode_diagnostics())
             for i, test_env in enumerate(evaluation_environments):
                 evaluate(test_env, sac_agent, cfg.algorithm.num_eval_episodes,
                          video_recorder)

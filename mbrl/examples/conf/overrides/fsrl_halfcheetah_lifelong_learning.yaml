@@ -80,3 +80,8 @@ sac_critic_lr: 0.00003
 sac_critic_target_update_frequency: 4
 sac_target_entropy: -3
 sac_hidden_depth: 2
+
+# Switching mechanism config
+# in ["last_n_episodes", "current_observation"]
+returns_expectation_calculation_method: "current_observation"  # "last_n_episodes"
+# returns_expectation_n_episodes: 3

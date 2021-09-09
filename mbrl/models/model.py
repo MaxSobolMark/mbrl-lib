@@ -331,6 +331,7 @@ class Ensemble(Model, abc.ABC):
         x: ModelInput,
         deterministic: bool = False,
         rng: Optional[torch.Generator] = None,
+        return_variance: bool = False,
         **kwargs,
     ) -> Tuple[torch.Tensor, ...]:
         """Samples an output of the dynamics model from the modeled Gaussian.
@@ -345,11 +346,20 @@ class Ensemble(Model, abc.ABC):
             (tensor): the sampled output.
         """
         if deterministic or self.deterministic:
-            return (self.forward(x, rng=rng)[0], )
+            if not return_variance:
+                return (self.forward(x, rng=rng)[0], )
+            mean, logvar = self.forward(x, rng=rng)
+            var = torch.exp(logvar)
+            return (mean, var)
         assert rng is not None
         means, logvars = self.forward(x, rng=rng)
         variances = logvars.exp()
         stds = torch.sqrt(variances)
         stds = torch.nn.functional.relu(stds)  # To not have negative stds.
+        stds = torch.nan_to_num(stds)
         assert torch.all(stds >= 0), stds
-        return (torch.normal(means, stds, generator=rng), )
+        if return_variance:
+            return (torch.normal(means, stds,
+                                 generator=rng), torch.nan_to_num(variances))
+        else:
+            return (torch.normal(means, stds, generator=rng), )
