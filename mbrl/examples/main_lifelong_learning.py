@@ -3,6 +3,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 from typing import Dict, List, Tuple, Optional
+from functools import partial
 import gym
 import hydra
 import numpy as np
@@ -39,6 +40,31 @@ def make_env(
         else:
             reward_fn = getattr(mbrl.env.reward_fns, cfg.overrides.term_fn,
                                 None)
+    elif 'metaworld___' in env_name:
+        import metaworld
+        import mbrl.env
+        env_name = env_name.split('___')[1]
+        term_fn = getattr(mbrl.env.termination_fns, cfg.overrides.term_fn)
+        task_index = env_cfg.task_index
+        if env_name == 'drawer-open-v2-max':
+            from mbrl.env.metaworld_envs import sawyer_drawer_open_v2
+            env = sawyer_drawer_open_v2.SawyerDrawerOpenEnvV2(
+                **env_cfg.env_kwargs)
+            mt1 = metaworld.MT1('drawer-open-v2')
+        elif env_name == 'drawer-close-v2-max':
+            from mbrl.env.metaworld_envs import sawyer_drawer_close_v2
+            env = sawyer_drawer_close_v2.SawyerDrawerCloseEnvV2(
+                **env_cfg.env_kwargs)
+            mt1 = metaworld.MT1('drawer-close-v2')
+        else:
+            mt1 = metaworld.MT1(env_name)
+            env = mt1.train_classes[list(mt1.train_classes)[0]]()
+        task = mt1.train_tasks[task_index]
+        env.set_task(task)
+        reward_fn = DOMAIN_TO_REWARD_FUNCTION[env_name](env)
+        env = gym.wrappers.TimeLimit(env,
+                                     max_episode_steps=cfg.overrides.get(
+                                         "trial_length", 500))
     else:
         import mbrl.env.mujoco_envs
 
@@ -61,9 +87,11 @@ def make_env(
             term_fn = mbrl.env.termination_fns.no_termination
             reward_fn = getattr(mbrl.env.reward_fns, 'reacher', None)
         elif env_name == "pets_pusher":
-            env = mbrl.env.mujoco_envs.PusherEnv()
+            env_kwargs = env_cfg.get('env_kwargs', {})
+            env = mbrl.env.mujoco_envs.PusherEnv(**env_kwargs)
             term_fn = mbrl.env.termination_fns.no_termination
-            reward_fn = mbrl.env.reward_fns.pusher
+            # reward_fn = mbrl.env.reward_fns.pusher
+            reward_fn = DOMAIN_TO_REWARD_FUNCTION[env_cfg.reward_fn](env)
         elif env_name == "ant_truncated_obs":
             env = mbrl.env.mujoco_envs.AntTruncatedObsEnv()
             term_fn = mbrl.env.termination_fns.ant
@@ -83,6 +111,8 @@ def make_env(
     learned_rewards = cfg.overrides.get("learned_rewards", True)
     if learned_rewards:
         reward_fn = None
+    else:
+        reward_fn = partial(reward_fn, **env_cfg.get('reward_fn_kwargs', {}))
 
     if cfg.seed is not None:
         env.seed(cfg.seed)
@@ -122,8 +152,11 @@ def run(cfg: omegaconf.DictConfig):
         lifelong_learning_termination_fns[:num_tasks])
     lifelong_learning_reward_fns = lifelong_learning_reward_fns[:num_tasks]
     for i in range(len(lifelong_learning_envs)):
-        lifelong_learning_envs[i] = MultitaskWrapper(lifelong_learning_envs[i],
-                                                     i, num_tasks)
+        lifelong_learning_envs[i] = MultitaskWrapper(
+            lifelong_learning_envs[i],
+            i,
+            num_tasks,
+            include_task_id_in_obs_space=cfg.overrides.observe_task_id)
 
     print(
         f'[main_lifelong_learning:97] lifelong_learning_envs: {lifelong_learning_envs}'

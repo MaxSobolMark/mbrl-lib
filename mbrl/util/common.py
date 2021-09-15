@@ -81,9 +81,20 @@ def create_one_dim_tr_model(
     if model_cfg._target_ == "mbrl.models.BasicEnsemble":
         model_cfg = model_cfg.member_cfg
     if model_cfg.get("in_size", None) is None:
-        model_cfg.in_size = obs_shape[0] + (act_shape[0] if act_shape else 1)
+        if not cfg.overrides.observe_task_id:
+            model_cfg.in_size = obs_shape[0] + (act_shape[0] if act_shape else
+                                                1) - len(cfg.overrides.envs)
+        else:
+            model_cfg.in_size = obs_shape[0] + (act_shape[0]
+                                                if act_shape else 1)
     if model_cfg.get("out_size", None) is None:
-        model_cfg.out_size = obs_shape[0] + int(cfg.algorithm.learned_rewards)
+        if not cfg.overrides.observe_task_id:
+            model_cfg.out_size = obs_shape[0] + int(
+                cfg.algorithm.learned_rewards) - len(cfg.overrides.envs)
+            print('[common:89] out_size: ', model_cfg.out_size)
+        else:
+            model_cfg.out_size = obs_shape[0] + int(
+                cfg.algorithm.learned_rewards)
 
     # Now instantiate the model
     model = hydra.utils.instantiate(cfg.dynamics_model.model)

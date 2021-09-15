@@ -30,19 +30,20 @@ def truncated_normal_init(m: nn.Module):
 
 class EnsembleLinearLayer(nn.Module):
     """Efficient linear layer for ensemble models."""
-
-    def __init__(
-        self, num_members: int, in_size: int, out_size: int, bias: bool = True
-    ):
+    def __init__(self,
+                 num_members: int,
+                 in_size: int,
+                 out_size: int,
+                 bias: bool = True):
         super().__init__()
         self.num_members = num_members
         self.in_size = in_size
         self.out_size = out_size
         self.weight = nn.Parameter(
-            torch.rand(self.num_members, self.in_size, self.out_size)
-        )
+            torch.rand(self.num_members, self.in_size, self.out_size))
         if bias:
-            self.bias = nn.Parameter(torch.rand(self.num_members, 1, self.out_size))
+            self.bias = nn.Parameter(
+                torch.rand(self.num_members, 1, self.out_size))
             self.use_bias = True
         else:
             self.use_bias = False
@@ -65,10 +66,8 @@ class EnsembleLinearLayer(nn.Module):
                 return xw
 
     def extra_repr(self) -> str:
-        return (
-            f"num_members={self.num_members}, in_size={self.in_size}, "
-            f"out_size={self.out_size}, bias={self.use_bias}"
-        )
+        return (f"num_members={self.num_members}, in_size={self.in_size}, "
+                f"out_size={self.out_size}, bias={self.use_bias}")
 
     def set_elite(self, elite_models: Sequence[int]):
         self.elite_models = list(elite_models)

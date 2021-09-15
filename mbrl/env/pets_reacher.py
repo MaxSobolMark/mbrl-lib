@@ -173,11 +173,12 @@ class Reacher3DEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         print('NOT SUPPOSED TO RUN THIS!')
         raise NotImplementedError
 
-    @staticmethod
     def forward_postprocess_fn(
-        inputs: torch.Tensor, mean: torch.Tensor, logvar: torch.Tensor,
+        self, inputs: torch.Tensor, mean: torch.Tensor, logvar: torch.Tensor,
         min_logvar: torch.nn.parameter.Parameter
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        mean[..., 7:10] = inputs[..., 7:10]
-        logvar[..., 7:10] = torch.full(logvar[..., 7:10].shape, -float('inf'))
+        if not self._hide_goal:
+            mean[..., 7:10] = inputs[..., 7:10]
+            logvar[..., 7:10] = torch.full(logvar[..., 7:10].shape,
+                                           -float('inf'))
         return mean, logvar

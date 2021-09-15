@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --partition=iris --qos=normal
-#SBATCH --exclude=iris3
+#SBATCH --exclude=iris3,iris6
 #SBATCH --include=iris1,iris2,iris4
 #SBATCH --time=50:00:00
 #SBATCH --nodes=1
@@ -20,7 +20,7 @@
 # list out some useful information (optional)
 echo "SLURM_JOBID="$SLURM_JOBID
 echo "SLURM_JOB_NODELIST"=$SLURM_JOB_NODELIST
-pecho "SLURM_NNODES"=$SLURM_NNODES
+echo "SLURM_NNODES"=$SLURM_NNODES
 echo "SLURMTMPDIR="$SLURMTMPDIR
 echo "working directory = "$SLURM_SUBMIT_DIR
 

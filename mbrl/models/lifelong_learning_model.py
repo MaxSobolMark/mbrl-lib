@@ -10,6 +10,7 @@ import hydra
 import gtimer as gt
 
 import numpy as np
+import omegaconf
 import torch
 
 import mbrl.models.util as model_util
@@ -44,6 +45,7 @@ class LifelongLearningModel():  # Model):
         num_tasks: int,
         obs_shape: Tuple[int, ...],
         act_shape: Tuple[int, ...],
+        cfg: omegaconf.DictConfig,
         observe_task_id: bool = False,
         forward_postprocess_fn: Callable[[
             torch.Tensor, torch.Tensor, torch.Tensor, torch.nn.parameter.
@@ -56,6 +58,7 @@ class LifelongLearningModel():  # Model):
         self._num_tasks = num_tasks
         self._obs_shape = obs_shape
         self._act_shape = act_shape
+        self._cfg = cfg
         self._observe_task_id = observe_task_id
         self._forward_postprocess_fn = forward_postprocess_fn
         self.device = model.device
@@ -64,7 +67,6 @@ class LifelongLearningModel():  # Model):
         # Make the dimensions of the task ID not delta.
         # Extend the no_delta_list with -1, -2, -3, ..., -self._num_tasks.
         print('self._model.no_delta_list: ', self._model.no_delta_list)
-        print('asdasd: ', list(range(-1, -self._num_tasks - 1, -1)))
         self._model.no_delta_list.extend(
             list(range(-1, -self._num_tasks - 1, -1)))
 
@@ -75,25 +77,53 @@ class LifelongLearningModel():  # Model):
         # if not self._observe_task_id:
         # x contains the observations and the actions
         observations = x[..., :-np.prod(self._act_shape)]
+        # if self._num_tasks > 1:
+        observations, task_ids = separate_observations_and_task_ids(
+            observations, self._num_tasks)
         if self._num_tasks > 1:
-            observations, task_ids = separate_observations_and_task_ids(
-                observations, self._num_tasks)
-            assert task_ids.min() == 0., f'task_ids.min(): {task_ids.min()}'
+            assert task_ids.min(
+            ) == 0., f'task_ids.min(): {task_ids.min()}\ntask_ids: {task_ids}'
             assert task_ids.max() == 1., f'task_ids.max(): {task_ids.max()}'
-            assert torch.all(
-                torch.logical_or(
-                    task_ids.eq(torch.ones_like(task_ids).to(self.device)),
-                    task_ids.eq(torch.zeros_like(task_ids).to(self.device))))
-            if self._observe_task_id:
-                observations = torch.cat([observations, task_ids], dim=-1)
-        x[..., :-np.prod(self._act_shape)] = observations
+        assert torch.all(
+            torch.logical_or(
+                task_ids.eq(torch.ones_like(task_ids).to(self.device)),
+                task_ids.eq(torch.zeros_like(task_ids).to(self.device))))
+        if self._observe_task_id:
+            observations = torch.cat([observations, task_ids], dim=-1)
+        x = torch.cat([observations, x[..., -np.prod(self._act_shape):]],
+                      dim=-1)
+        # x[..., :-np.prod(self._act_shape)] = observations
         gt.stamp('forward_preprocessing')
         mean, logvar = self._original_forward(x, **kwargs)
         gt.stamp('original_forward')
-        if self._num_tasks > 1:
+        # if self._num_tasks > 1:
+        if not self._observe_task_id:
+            task_ids_for_concatenation = torch.broadcast_to(
+                task_ids, mean.shape[:-1] + (task_ids.shape[-1], ))
+            if not self._cfg.overrides.learned_rewards:
+                mean = torch.cat([mean, task_ids_for_concatenation], dim=-1)
+                logvar = torch.cat([logvar, task_ids_for_concatenation],
+                                   dim=-1)
+            else:
+                mean = torch.cat([
+                    mean[..., :-1], task_ids_for_concatenation,
+                    mean[..., -1][..., None]
+                ],
+                                 dim=-1)
+                logvar = torch.cat([
+                    logvar[..., :-1], task_ids_for_concatenation,
+                    logvar[..., -1][..., None]
+                ],
+                                   dim=-1)
+        if not self._cfg.overrides.learned_rewards:
             mean[..., -self._num_tasks:] = task_ids.detach()
             logvar[..., -self._num_tasks:] = (torch.ones_like(task_ids) *
                                               -float('inf')).detach()
+        else:
+            mean[..., -(self._num_tasks + 1):-1] = task_ids.detach()
+            logvar[...,
+                   -(self._num_tasks + 1):-1] = (torch.ones_like(task_ids) *
+                                                 -float('inf')).detach()
         if self._forward_postprocess_fn is not None:
             mean, logvar = self._forward_postprocess_fn(
                 original_inputs, mean, logvar, self._model.model.min_logvar)

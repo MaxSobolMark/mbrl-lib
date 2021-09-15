@@ -44,12 +44,19 @@ def pusher(act: torch.Tensor, next_obs: torch.Tensor) -> torch.Tensor:
     return -(obs_cost + act_cost).view(-1, 1)
 
 
+from numpy.random import MT19937, RandomState, SeedSequence
+
+
 def reacher(act: torch.Tensor,
             next_obs: torch.Tensor,
+            task_index: int,
             device: str = '') -> torch.Tensor:
     assert len(next_obs.shape) == len(act.shape) == 2
     # print('[reward_fns:49] next_obs.shape: ', next_obs.shape)
-    goals = next_obs[:, 7:10]
+    rng = RandomState(MT19937(SeedSequence(task_index)))
+    goals = torch.from_numpy(rng.normal(loc=0, scale=0.1,
+                                        size=[3])).to(device).float()
+    # goals = next_obs[:, 7:10]
     # print('[reward_fns:50] goals: ', goals)
     from mbrl.env.pets_reacher import Reacher3DEnv
     reward = -torch.sum(torch.square(

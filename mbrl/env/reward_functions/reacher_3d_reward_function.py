@@ -1,5 +1,5 @@
 from .base_reward_function import BaseRewardFunction
-import tensorflow as tf
+import torch
 import numpy as np
 
 

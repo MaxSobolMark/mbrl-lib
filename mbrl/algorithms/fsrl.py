@@ -116,6 +116,7 @@ def train(
         num_tasks,
         obs_shape,
         act_shape,
+        cfg,
         observe_task_id=cfg.overrides.observe_task_id,
         forward_postprocess_fn=forward_postprocess_fn,
     )
@@ -150,10 +151,13 @@ def train(
 
     # ---------------------------------------------------------
     # ---------- Create model environment and planning agent --
-    reward_function = partial(
-        general_reward_function,
-        list_of_reward_functions=lifelong_learning_reward_fns,
-        device=cfg.device)
+    if cfg.overrides.learned_rewards:
+        reward_function = None
+    else:
+        reward_function = partial(
+            general_reward_function,
+            list_of_reward_functions=lifelong_learning_reward_fns,
+            device=cfg.device)
     model_env = mbrl.models.ModelEnv(lifelong_learning_envs[0],
                                      dynamics_model,
                                      termination_fn,
