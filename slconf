@@ -1,10 +1,10 @@
 --partition=iris
 --qos=normal
---exclude=iris3
---time=16:00:00
+--exclude=iris3,iris6
+--time=100:00:00
 --nodes=1
 --cpus-per-task=4
---mem=10G
+--mem=20G
 --gres=gpu:1
 --output=$1-%j.out
 --mail-user=maxsobolmark@stanford.edu

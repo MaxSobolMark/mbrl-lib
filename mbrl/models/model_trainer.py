@@ -147,14 +147,12 @@ class ModelTrainer:
             total_avg_loss = np.mean(batch_losses).mean().item()
             training_losses.append(total_avg_loss)
 
-            eval_score = self.evaluate(
-                eval_dataset, batch_callback=batch_callback_epoch
-            )
+            eval_score = self.evaluate(eval_dataset,
+                                       batch_callback=batch_callback_epoch)
             val_scores.append(eval_score.mean().item())
 
             maybe_best_weights = self.maybe_get_best_weights(
-                best_val_score, eval_score, improvement_threshold
-            )
+                best_val_score, eval_score, improvement_threshold)
             if maybe_best_weights:
                 best_val_score = torch.minimum(best_val_score, eval_score)
                 best_weights = maybe_best_weights
@@ -166,15 +164,21 @@ class ModelTrainer:
                 self.logger.log_data(
                     self._LOG_GROUP_NAME,
                     {
-                        "iteration": self._train_iteration,
-                        "epoch": epoch,
-                        "train_dataset_size": dataset_train.num_stored,
-                        "val_dataset_size": dataset_val.num_stored
-                        if dataset_val is not None
-                        else 0,
-                        "model_loss": total_avg_loss,
-                        "model_val_score": eval_score.mean(),
-                        "model_best_val_score": best_val_score.mean(),
+                        "iteration":
+                        self._train_iteration,
+                        "epoch":
+                        epoch,
+                        "train_dataset_size":
+                        dataset_train.num_stored,
+                        "val_dataset_size":
+                        dataset_val.num_stored
+                        if dataset_val is not None else 0,
+                        "model_loss":
+                        total_avg_loss,
+                        "model_val_score":
+                        eval_score.mean(),
+                        "model_best_val_score":
+                        best_val_score.mean(),
                     },
                 )
             if callback:
@@ -196,9 +200,9 @@ class ModelTrainer:
         self._train_iteration += 1
         return training_losses, val_scores
 
-    def evaluate(
-        self, dataset: TransitionIterator, batch_callback: Optional[Callable] = None
-    ) -> torch.Tensor:
+    def evaluate(self,
+                 dataset: TransitionIterator,
+                 batch_callback: Optional[Callable] = None) -> torch.Tensor:
         """Evaluates the model on the validation dataset.
 
         Iterates over the dataset, one batch at a time, and calls
@@ -234,7 +238,8 @@ class ModelTrainer:
             batch_scores_list.append(batch_score)
             if batch_callback:
                 batch_callback(batch_score.mean(), meta, "eval")
-        batch_scores = torch.cat(batch_scores_list, dim=batch_scores_list[0].ndim - 2)
+        batch_scores = torch.cat(batch_scores_list,
+                                 dim=batch_scores_list[0].ndim - 2)
 
         if isinstance(dataset, BootstrapIterator):
             dataset.toggle_bootstrap()
@@ -268,12 +273,11 @@ class ModelTrainer:
         improved = (improvement > threshold).any().item()
         return copy.deepcopy(self.model.state_dict()) if improved else None
 
-    def _maybe_set_best_weights_and_elite(
-        self, best_weights: Optional[Dict], best_val_score: torch.Tensor
-    ):
+    def _maybe_set_best_weights_and_elite(self, best_weights: Optional[Dict],
+                                          best_val_score: torch.Tensor):
         if best_weights is not None:
             self.model.load_state_dict(best_weights)
         if len(best_val_score) > 1 and hasattr(self.model, "num_elites"):
             sorted_indices = np.argsort(best_val_score.tolist())
-            elite_models = sorted_indices[: self.model.num_elites]
+            elite_models = sorted_indices[:self.model.num_elites]
             self.model.set_elite(elite_models)

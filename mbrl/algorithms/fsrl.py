@@ -241,6 +241,7 @@ def train(
                 act_shape,
                 torch.device(cfg.device),
             )
+            step_info = None
             while not done:
                 # --------------- Model Training -----------------
                 if env_steps % cfg.algorithm.freq_train_model == 0:
@@ -254,7 +255,7 @@ def train(
                     gt.stamp('train_model')
 
                 # --- Doing env step using the agent and adding to model dataset ---
-                next_obs, reward, done, _ = mbrl.util.common.step_env_and_add_to_buffer(
+                next_obs, reward, done, step_info = mbrl.util.common.step_env_and_add_to_buffer(
                     lifelong_learning_envs[task_i], obs, agent, {},
                     task_replay_buffers[task_i])
                 gt.stamp('step_env')
@@ -321,17 +322,16 @@ def train(
                     active_policy = 1
                 else:
                     active_policy = 0
-                logger.log_data(
-                    mbrl.constants.RESULTS_LOG_NAME,
-                    {
-                        "epoch": epoch,
-                        "env_step": env_steps,
-                        "episode_reward": total_reward,
-                        "rollout_length": rollout_length,
-                        "task_index": task_i,
-                        'active_policy': active_policy,
-                    },
-                )
+                results_dict = {
+                    "epoch": epoch,
+                    "env_step": env_steps,
+                    "episode_reward": total_reward,
+                    "rollout_length": rollout_length,
+                    "task_index": task_i,
+                    'active_policy': active_policy,
+                }
+                results_dict.update(step_info)
+                logger.log_data(mbrl.constants.RESULTS_LOG_NAME, results_dict)
                 if hasattr(agent, 'get_episode_diagnostics'):
                     logger.log_data('policy_diagnostics',
                                     agent.get_episode_diagnostics())

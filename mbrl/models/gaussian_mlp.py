@@ -82,9 +82,10 @@ class GaussianMLP(Ensemble):
         propagation_method: Optional[str] = None,
         learn_logvar_bounds: bool = False,
     ):
-        super().__init__(
-            ensemble_size, device, propagation_method, deterministic=deterministic
-        )
+        super().__init__(ensemble_size,
+                         device,
+                         propagation_method,
+                         deterministic=deterministic)
 
         self.in_size = in_size
         self.out_size = out_size
@@ -95,27 +96,25 @@ class GaussianMLP(Ensemble):
             return EnsembleLinearLayer(ensemble_size, l_in, l_out)
 
         hidden_layers = [
-            nn.Sequential(create_linear_layer(in_size, hid_size), activation_cls())
+            nn.Sequential(create_linear_layer(in_size, hid_size),
+                          activation_cls())
         ]
         for i in range(num_layers - 1):
             hidden_layers.append(
                 nn.Sequential(
                     create_linear_layer(hid_size, hid_size),
                     activation_cls(),
-                )
-            )
+                ))
         self.hidden_layers = nn.Sequential(*hidden_layers)
 
         if deterministic:
             self.mean_and_logvar = create_linear_layer(hid_size, out_size)
         else:
             self.mean_and_logvar = create_linear_layer(hid_size, 2 * out_size)
-            self.min_logvar = nn.Parameter(
-                -10 * torch.ones(1, out_size), requires_grad=learn_logvar_bounds
-            )
-            self.max_logvar = nn.Parameter(
-                0.5 * torch.ones(1, out_size), requires_grad=learn_logvar_bounds
-            )
+            self.min_logvar = nn.Parameter(-10 * torch.ones(1, out_size),
+                                           requires_grad=learn_logvar_bounds)
+            self.max_logvar = nn.Parameter(0.5 * torch.ones(1, out_size),
+                                           requires_grad=learn_logvar_bounds)
 
         self.apply(truncated_normal_init)
         self.to(self.device)
@@ -136,8 +135,10 @@ class GaussianMLP(Ensemble):
             self.mean_and_logvar.toggle_use_only_elite()
 
     def _default_forward(
-        self, x: torch.Tensor, only_elite: bool = False, **_kwargs
-    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+            self,
+            x: torch.Tensor,
+            only_elite: bool = False,
+            **_kwargs) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         self._maybe_toggle_layers_use_only_elite(only_elite)
         x = self.hidden_layers(x)
         mean_and_logvar = self.mean_and_logvar(x)
@@ -145,8 +146,8 @@ class GaussianMLP(Ensemble):
         if self.deterministic:
             return mean_and_logvar, None
         else:
-            mean = mean_and_logvar[..., : self.out_size]
-            logvar = mean_and_logvar[..., self.out_size :]
+            mean = mean_and_logvar[..., :self.out_size]
+            logvar = mean_and_logvar[..., self.out_size:]
             logvar = self.max_logvar - F.softplus(self.max_logvar - logvar)
             logvar = self.min_logvar + F.softplus(logvar - self.min_logvar)
             return mean, logvar
@@ -156,12 +157,10 @@ class GaussianMLP(Ensemble):
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         _, batch_size, _ = x.shape
 
-        num_models = (
-            len(self.elite_models) if self.elite_models is not None else len(self)
-        )
-        shuffled_x = x[:, model_shuffle_indices, ...].view(
-            num_models, batch_size // num_models, -1
-        )
+        num_models = (len(self.elite_models)
+                      if self.elite_models is not None else len(self))
+        shuffled_x = x[:, model_shuffle_indices,
+                       ...].view(num_models, batch_size // num_models, -1)
 
         mean, logvar = self._default_forward(shuffled_x, only_elite=True)
         # note that mean and logvar are shuffled
@@ -170,7 +169,8 @@ class GaussianMLP(Ensemble):
 
         if logvar is not None:
             logvar = logvar.view(batch_size, -1)
-            logvar[model_shuffle_indices] = logvar.clone()  # invert the shuffle
+            logvar[model_shuffle_indices] = logvar.clone(
+            )  # invert the shuffle
 
         return mean, logvar
 
@@ -186,15 +186,13 @@ class GaussianMLP(Ensemble):
                 logvar = logvar[0] if logvar is not None else None
             return mean, logvar
         assert x.ndim == 2
-        model_len = (
-            len(self.elite_models) if self.elite_models is not None else len(self)
-        )
+        model_len = (len(self.elite_models)
+                     if self.elite_models is not None else len(self))
         if x.shape[0] % model_len != 0:
             raise ValueError(
                 f"GaussianMLP ensemble requires batch size to be a multiple of the "
                 f"number of models. Current batch size is {x.shape[0]} for "
-                f"{model_len} models."
-            )
+                f"{model_len} models.")
         x = x.unsqueeze(0)
         if self.propagation_method == "random_model":
             # passing generator causes segmentation fault
@@ -206,7 +204,8 @@ class GaussianMLP(Ensemble):
         if self.propagation_method == "expectation":
             mean, logvar = self._default_forward(x, only_elite=True)
             return mean.mean(dim=0), logvar.mean(dim=0)
-        raise ValueError(f"Invalid propagation method {self.propagation_method}.")
+        raise ValueError(
+            f"Invalid propagation method {self.propagation_method}.")
 
     def forward(  # type: ignore
         self,
@@ -267,15 +266,18 @@ class GaussianMLP(Ensemble):
             return self._forward_ensemble(x, rng=rng)
         return self._default_forward(x)
 
-    def _mse_loss(self, model_in: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+    def _mse_loss(self, model_in: torch.Tensor,
+                  target: torch.Tensor) -> torch.Tensor:
         assert model_in.ndim == target.ndim
         if model_in.ndim == 2:  # add model dimension
             model_in = model_in.unsqueeze(0)
             target = target.unsqueeze(0)
         pred_mean, _ = self.forward(model_in, use_propagation=False)
-        return F.mse_loss(pred_mean, target, reduction="none").sum((1, 2)).sum()
+        return F.mse_loss(pred_mean, target, reduction="none").sum(
+            (1, 2)).sum()
 
-    def _nll_loss(self, model_in: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+    def _nll_loss(self, model_in: torch.Tensor,
+                  target: torch.Tensor) -> torch.Tensor:
         assert model_in.ndim == target.ndim
         if model_in.ndim == 2:  # add ensemble dimension
             model_in = model_in.unsqueeze(0)
@@ -284,10 +286,10 @@ class GaussianMLP(Ensemble):
         if target.shape[0] != self.num_members:
             target = target.repeat(self.num_members, 1, 1)
         nll = (
-            mbrl.util.math.gaussian_nll(pred_mean, pred_logvar, target, reduce=False)
-            .mean((1, 2))  # average over batch and target dimension
-            .sum()
-        )  # sum over ensemble dimension
+            mbrl.util.math.gaussian_nll(
+                pred_mean, pred_logvar, target, reduce=False).mean(
+                    (1, 2))  # average over batch and target dimension
+            .sum())  # sum over ensemble dimension
         nll += 0.01 * (self.max_logvar.sum() - self.min_logvar.sum())
         return nll
 
@@ -322,7 +324,9 @@ class GaussianMLP(Ensemble):
             return self._nll_loss(model_in, target), {}
 
     def eval_score(  # type: ignore
-        self, model_in: torch.Tensor, target: Optional[torch.Tensor] = None
+        self,
+        model_in: torch.Tensor,
+        target: Optional[torch.Tensor] = None
     ) -> Tuple[torch.Tensor, Dict[str, Any]]:
         """Computes the squared error for the model over the given input/target.
 
@@ -348,8 +352,9 @@ class GaussianMLP(Ensemble):
             return F.mse_loss(pred_mean, target, reduction="none"), {}
 
     def reset(  # type: ignore
-        self, x: torch.Tensor, rng: Optional[torch.Generator] = None
-    ) -> torch.Tensor:
+            self,
+            x: torch.Tensor,
+            rng: Optional[torch.Generator] = None) -> torch.Tensor:
         """Initializes any internal dependent state when using the model for simulation.
 
         Initializes model indices for "fixed_model" propagation method
@@ -364,22 +369,21 @@ class GaussianMLP(Ensemble):
             (tensor): forwards the same input.
         """
         assert rng is not None
-        self._propagation_indices = self._sample_propagation_indices(x.shape[0], rng)
+        self._propagation_indices = self._sample_propagation_indices(
+            x.shape[0], rng)
         return x
 
-    def _sample_propagation_indices(
-        self, batch_size: int, _rng: torch.Generator
-    ) -> torch.Tensor:
+    def _sample_propagation_indices(self, batch_size: int,
+                                    _rng: torch.Generator) -> torch.Tensor:
         """Returns a random permutation of integers in [0, ``batch_size``)."""
-        model_len = (
-            len(self.elite_models) if self.elite_models is not None else len(self)
-        )
+        model_len = (len(self.elite_models)
+                     if self.elite_models is not None else len(self))
         if batch_size % model_len != 0:
             raise ValueError(
                 "To use GaussianMLP's ensemble propagation, the batch size must "
                 "be a multiple of the number of models in the ensemble."
-                "batch_size: " + str(batch_size) + "; model_len: " + str(model_len)
-            )
+                "batch_size: " + str(batch_size) + "; model_len: " +
+                str(model_len))
         # rng causes segmentation fault, see https://github.com/pytorch/pytorch/issues/44714
         return torch.randperm(batch_size, device=self.device)
 
@@ -395,8 +399,7 @@ class GaussianMLP(Ensemble):
         if self.elite_models:
             warnings.warn(
                 "Future versions of GaussianMLP will save elite models in the same "
-                "checkpoint file as the model weights."
-            )
+                "checkpoint file as the model weights.")
             with open(elite_path, "wb") as f:
                 pickle.dump(self.elite_models, f)
 
@@ -408,9 +411,9 @@ class GaussianMLP(Ensemble):
         if pathlib.Path.is_file(elite_path):
             warnings.warn(
                 "Future versions of GaussianMLP will load elite models from the same "
-                "checkpoint file as the model weights."
-            )
+                "checkpoint file as the model weights.")
             with open(elite_path, "rb") as f:
                 self.elite_models = pickle.load(f)
         else:
-            warnings.warn("No elite model information found in model load directory.")
+            warnings.warn(
+                "No elite model information found in model load directory.")

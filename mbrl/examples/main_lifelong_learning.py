@@ -183,17 +183,17 @@ def run(cfg: omegaconf.DictConfig):
     #     test_env, *_ = mujoco_util.make_env(cfg)
     #     return mbpo.train(env, test_env, term_fn, cfg)
     if cfg.algorithm.name == "fsrl":
-        fsrl.train(
-            lifelong_learning_envs,
-            [],  # TODO: ADD EVALUATION ENVIRONMENTS
-            lifelong_learning_task_names,
-            lifelong_learning_termination_fns,
-            lifelong_learning_reward_fns,
-            lifelong_learning_termination_fns[0],
-            fsrl.PolicyType(cfg.overrides.policy_to_use.upper()),
-            cfg,
-            forward_postprocess_fn=getattr(lifelong_learning_envs[0],
-                                           'forward_postprocess_fn', None))
+        fsrl.train(lifelong_learning_envs,
+                   lifelong_learning_envs,
+                   lifelong_learning_task_names,
+                   lifelong_learning_termination_fns,
+                   lifelong_learning_reward_fns,
+                   lifelong_learning_termination_fns[0],
+                   fsrl.PolicyType(cfg.overrides.policy_to_use.upper()),
+                   cfg,
+                   forward_postprocess_fn=getattr(lifelong_learning_envs[0],
+                                                  'forward_postprocess_fn',
+                                                  None))
 
 
 if __name__ == "__main__":

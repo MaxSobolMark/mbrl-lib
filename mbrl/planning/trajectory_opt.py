@@ -66,7 +66,6 @@ class CEMOptimizer(Optimizer):
     [1] R. Rubinstein and W. Davidson. "The cross-entropy method for combinatorial and continuous
     optimization". Methodology and Computing in Applied Probability, 1999.
     """
-
     def __init__(
         self,
         num_iterations: int,
@@ -82,12 +81,15 @@ class CEMOptimizer(Optimizer):
         self.num_iterations = num_iterations
         self.elite_ratio = elite_ratio
         self.population_size = population_size
-        self.elite_num = np.ceil(self.population_size * self.elite_ratio).astype(
-            np.int32
-        )
-        self.lower_bound = torch.tensor(lower_bound, device=device, dtype=torch.float32)
-        self.upper_bound = torch.tensor(upper_bound, device=device, dtype=torch.float32)
-        self.initial_var = ((self.upper_bound - self.lower_bound) ** 2) / 16
+        self.elite_num = np.ceil(self.population_size *
+                                 self.elite_ratio).astype(np.int32)
+        self.lower_bound = torch.tensor(lower_bound,
+                                        device=device,
+                                        dtype=torch.float32)
+        self.upper_bound = torch.tensor(upper_bound,
+                                        device=device,
+                                        dtype=torch.float32)
+        self.initial_var = ((self.upper_bound - self.lower_bound)**2) / 16
         self.alpha = alpha
         self.return_mean_elites = return_mean_elites
         self.device = device
@@ -96,7 +98,8 @@ class CEMOptimizer(Optimizer):
         self,
         obj_fun: Callable[[torch.Tensor], torch.Tensor],
         x0: Optional[torch.Tensor] = None,
-        callback: Optional[Callable[[torch.Tensor, torch.Tensor, int], None]] = None,
+        callback: Optional[Callable[[torch.Tensor, torch.Tensor, int],
+                                    None]] = None,
         **kwargs,
     ) -> torch.Tensor:
         """Runs the optimization using CEM.
@@ -119,13 +122,13 @@ class CEMOptimizer(Optimizer):
 
         best_solution = torch.empty_like(mu)
         best_value = -np.inf
-        population = torch.zeros((self.population_size,) + x0.shape).to(
-            device=self.device
-        )
+        population = torch.zeros((self.population_size, ) +
+                                 x0.shape).to(device=self.device)
         for i in range(self.num_iterations):
             lb_dist = mu - self.lower_bound
             ub_dist = self.upper_bound - mu
-            mv = torch.min(torch.square(lb_dist / 2), torch.square(ub_dist / 2))
+            mv = torch.min(torch.square(lb_dist / 2),
+                           torch.square(ub_dist / 2))
             constrained_var = torch.min(mv, var)
 
             population = mbrl.util.math.truncated_normal_(population)
@@ -170,7 +173,6 @@ class MPPIOptimizer(Optimizer):
         upper_bound (sequence of floats): the upper bound for the optimization variables.
         device (torch.device): device where computations will be performed.
     """
-
     def __init__(
         self,
         num_iterations: int,
@@ -192,9 +194,13 @@ class MPPIOptimizer(Optimizer):
             dtype=torch.float32,
         )
 
-        self.lower_bound = torch.tensor(lower_bound, device=device, dtype=torch.float32)
-        self.upper_bound = torch.tensor(upper_bound, device=device, dtype=torch.float32)
-        self.var = sigma ** 2 * torch.ones_like(self.lower_bound)
+        self.lower_bound = torch.tensor(lower_bound,
+                                        device=device,
+                                        dtype=torch.float32)
+        self.upper_bound = torch.tensor(upper_bound,
+                                        device=device,
+                                        dtype=torch.float32)
+        self.var = sigma**2 * torch.ones_like(self.lower_bound)
         self.beta = beta
         self.gamma = gamma
         self.refinements = num_iterations
@@ -204,7 +210,8 @@ class MPPIOptimizer(Optimizer):
         self,
         obj_fun: Callable[[torch.Tensor], torch.Tensor],
         x0: Optional[torch.Tensor] = None,
-        callback: Optional[Callable[[torch.Tensor, torch.Tensor, int], None]] = None,
+        callback: Optional[Callable[[torch.Tensor, torch.Tensor, int],
+                                    None]] = None,
         **kwargs,
     ) -> torch.Tensor:
         """Implementation of MPPI planner.
@@ -236,28 +243,26 @@ class MPPIOptimizer(Optimizer):
 
             lb_dist = self.mean - self.lower_bound
             ub_dist = self.upper_bound - self.mean
-            mv = torch.minimum(torch.square(lb_dist / 2), torch.square(ub_dist / 2))
+            mv = torch.minimum(torch.square(lb_dist / 2),
+                               torch.square(ub_dist / 2))
             constrained_var = torch.minimum(mv, self.var)
             population = noise.clone() * torch.sqrt(constrained_var)
 
             # smoothed actions with noise
-            population[:, 0, :] = (
-                self.beta * (self.mean[0, :] + noise[:, 0, :])
-                + (1 - self.beta) * past_action
-            )
+            population[:, 0, :] = (self.beta *
+                                   (self.mean[0, :] + noise[:, 0, :]) +
+                                   (1 - self.beta) * past_action)
             for i in range(max(self.planning_horizon - 1, 0)):
-                population[:, i + 1, :] = (
-                    self.beta * (self.mean[i + 1] + noise[:, i + 1, :])
-                    + (1 - self.beta) * population[:, i, :]
-                )
+                population[:, i +
+                           1, :] = (self.beta *
+                                    (self.mean[i + 1] + noise[:, i + 1, :]) +
+                                    (1 - self.beta) * population[:, i, :])
             # clipping actions
             # This should still work if the bounds between dimensions are different.
-            population = torch.where(
-                population > self.upper_bound, self.upper_bound, population
-            )
-            population = torch.where(
-                population < self.lower_bound, self.lower_bound, population
-            )
+            population = torch.where(population > self.upper_bound,
+                                     self.upper_bound, population)
+            population = torch.where(population < self.lower_bound,
+                                     self.lower_bound, population)
             values = obj_fun(population)
             values[values.isnan()] = -1e-10
 
@@ -301,7 +306,6 @@ class TrajectoryOptimizer:
             shifted ``replan_freq`` time steps, and the new entries are filled using th3 initial
             solution. Defaults to ``True``.
     """
-
     def __init__(
         self,
         optimizer_cfg: omegaconf.DictConfig,
@@ -311,15 +315,16 @@ class TrajectoryOptimizer:
         replan_freq: int = 1,
         keep_last_solution: bool = True,
     ):
-        optimizer_cfg.lower_bound = np.tile(action_lb, (planning_horizon, 1)).tolist()
-        optimizer_cfg.upper_bound = np.tile(action_ub, (planning_horizon, 1)).tolist()
+        optimizer_cfg.lower_bound = np.tile(action_lb,
+                                            (planning_horizon, 1)).tolist()
+        optimizer_cfg.upper_bound = np.tile(action_ub,
+                                            (planning_horizon, 1)).tolist()
         self.optimizer: Optimizer = hydra.utils.instantiate(optimizer_cfg)
         self.initial_solution = (
-            ((torch.tensor(action_lb) + torch.tensor(action_ub)) / 2)
-            .float()
-            .to(optimizer_cfg.device)
-        )
-        self.initial_solution = self.initial_solution.repeat((planning_horizon, 1))
+            ((torch.tensor(action_lb) + torch.tensor(action_ub)) /
+             2).float().to(optimizer_cfg.device))
+        self.initial_solution = self.initial_solution.repeat(
+            (planning_horizon, 1))
         self.previous_solution = self.initial_solution.clone()
         self.replan_freq = replan_freq
         self.keep_last_solution = keep_last_solution
@@ -350,10 +355,12 @@ class TrajectoryOptimizer:
             callback=callback,
         )
         if self.keep_last_solution:
-            self.previous_solution = best_solution.roll(-self.replan_freq, dims=0)
+            self.previous_solution = best_solution.roll(-self.replan_freq,
+                                                        dims=0)
             # Note that initial_solution[i] is the same for all values of [i],
             # so just pick i = 0
-            self.previous_solution[-self.replan_freq :] = self.initial_solution[0]
+            self.previous_solution[-self.
+                                   replan_freq:] = self.initial_solution[0]
         return best_solution.cpu().numpy()
 
     def reset(self):
@@ -384,7 +391,6 @@ class TrajectoryOptimizerAgent(Agent):
         be automatically instantiated with Hydra (which in turn makes it easy to replace this
         agent with an agent of another type via config-only changes).
     """
-
     def __init__(
         self,
         optimizer_cfg: omegaconf.DictConfig,
@@ -412,8 +418,7 @@ class TrajectoryOptimizerAgent(Agent):
         self.verbose = verbose
 
     def set_trajectory_eval_fn(
-        self, trajectory_eval_fn: mbrl.types.TrajectoryEvalFnType
-    ):
+            self, trajectory_eval_fn: mbrl.types.TrajectoryEvalFnType):
         """Sets the trajectory evaluation function.
 
         Args:
@@ -426,7 +431,8 @@ class TrajectoryOptimizerAgent(Agent):
         """Resets the underlying trajectory optimizer."""
         if planning_horizon:
             self.optimizer = TrajectoryOptimizer(
-                cast(omegaconf.DictConfig, self.optimizer_args["optimizer_cfg"]),
+                cast(omegaconf.DictConfig,
+                     self.optimizer_args["optimizer_cfg"]),
                 cast(np.ndarray, self.optimizer_args["action_lb"]),
                 cast(np.ndarray, self.optimizer_args["action_ub"]),
                 planning_horizon=planning_horizon,
@@ -463,11 +469,12 @@ class TrajectoryOptimizerAgent(Agent):
             plan = self.optimizer.optimize(trajectory_eval_fn)
             plan_time = time.time() - start_time
 
-            self.actions_to_use.extend([a for a in plan[: self.replan_freq]])
+            self.actions_to_use.extend([a for a in plan[:self.replan_freq]])
         action = self.actions_to_use.pop(0)
 
         if self.verbose:
             print(f"Planning time: {plan_time:.3f}")
+        print('[trajectory_opt:471] returning actions.')
         return action
 
     def plan(self, obs: np.ndarray, **_kwargs) -> np.ndarray:
@@ -518,9 +525,9 @@ def create_trajectory_optim_agent_for_model(
     agent = hydra.utils.instantiate(agent_cfg)
 
     def trajectory_eval_fn(initial_state, action_sequences):
-        return model_env.evaluate_action_sequences(
-            action_sequences, initial_state=initial_state, num_particles=num_particles
-        )
+        return model_env.evaluate_action_sequences(action_sequences,
+                                                   initial_state=initial_state,
+                                                   num_particles=num_particles)
 
     agent.set_trajectory_eval_fn(trajectory_eval_fn)
     return agent

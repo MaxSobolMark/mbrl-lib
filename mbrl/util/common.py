@@ -267,7 +267,7 @@ def get_basic_buffer_iterators(
         val_iter = TransitionIterator(val_data,
                                       batch_size,
                                       shuffle_each_epoch=False,
-                                      rng=replay_buffer.rng)
+                                      rng=rng)
 
     return train_iter, val_iter
 
