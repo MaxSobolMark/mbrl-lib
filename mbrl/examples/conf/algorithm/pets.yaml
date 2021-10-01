@@ -18,3 +18,4 @@ freq_train_model: ${overrides.freq_train_model}
 learned_rewards: ${overrides.learned_rewards}
 
 num_particles: 20
+planning_mopo_penalty_coeff: ${overrides.planning_mopo_penalty_coeff}

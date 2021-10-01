@@ -104,7 +104,7 @@ envs:
 
 term_fn: "no_termination"
 policy_to_use: "CEM_PLANNING"
-learned_rewards: true
+learned_rewards: false
 reward_fn: "reacher"
 num_steps: 15000
 trial_length: 150  # 1000
@@ -134,7 +134,7 @@ forward_postprocess_fn:
 # MBPO Config
 effective_model_rollouts_per_step: 400
 rollout_schedule: [20, 150, 1, 1]
-num_sac_updates_per_step: 40
+num_sac_updates_per_step: 0
 sac_updates_every_steps: 1
 num_epochs_to_retain_sac_buffer: 1
 
@@ -147,3 +147,5 @@ sac_critic_target_update_frequency: 4
 sac_target_entropy: -3
 sac_hidden_depth: 2
 sac_hidden_dim: 256
+
+planning_mopo_penalty_coeff: 0

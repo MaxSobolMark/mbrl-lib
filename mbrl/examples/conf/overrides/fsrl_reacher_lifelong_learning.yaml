@@ -104,7 +104,7 @@ envs:
 
 term_fn: "no_termination"
 policy_to_use: "COMBINED"
-learned_rewards: true
+learned_rewards: false
 reward_fn: "reacher"
 num_steps: 15000
 trial_length: 150  # 1000
@@ -152,3 +152,5 @@ sac_hidden_dim: 256
 # in ["last_n_episodes", "current_observation"]
 returns_expectation_calculation_method: "current_observation"
 returns_expectation_n_episodes: 3
+
+planning_mopo_penalty_coeff: 0

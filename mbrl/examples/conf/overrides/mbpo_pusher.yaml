@@ -45,7 +45,6 @@ sac_updates_every_steps: 1
 num_epochs_to_retain_sac_buffer: 1
 
 sac_batch_size: 256
-sac_alpha_lr: 0.0003
 sac_actor_lr: 0.0003
 sac_alpha_lr: 0.0001
 sac_actor_update_frequency: 1

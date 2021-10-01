@@ -12,7 +12,7 @@ envs:
     task_index: 1
 
 term_fn: "no_termination"
-policy_to_use: "EXPLICIT_POLICY"
+policy_to_use: "COMBINED"
 learned_rewards: false
 num_steps: 25000
 trial_length: 500
@@ -54,3 +54,10 @@ sac_critic_target_update_frequency: 4
 sac_target_entropy: -3
 sac_hidden_depth: 2
 sac_hidden_dim: 256
+
+# Switching mechanism config
+# in ["last_n_episodes", "current_observation"]
+returns_expectation_calculation_method: "current_observation"
+returns_expectation_n_episodes: 3
+
+planning_mopo_penalty_coeff: 0

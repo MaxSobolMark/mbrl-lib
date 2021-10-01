@@ -14,7 +14,7 @@ envs:
 term_fn: "no_termination"
 policy_to_use: "CEM_PLANNING"
 learned_rewards: false
-num_steps: 25000
+num_steps: 100000
 trial_length: 500
 epoch_length: 500
 
@@ -41,7 +41,7 @@ forward_postprocess_fn: None
 # MBPO Config
 effective_model_rollouts_per_step: 400
 rollout_schedule: [20, 150, 1, 1]
-num_sac_updates_per_step: 20
+num_sac_updates_per_step: 0
 sac_updates_every_steps: 1
 num_epochs_to_retain_sac_buffer: 1
 
