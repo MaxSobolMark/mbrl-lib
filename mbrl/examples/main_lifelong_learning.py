@@ -4,6 +4,7 @@
 # LICENSE file in the root directory of this source tree.
 from typing import Dict, List, Tuple, Optional
 from functools import partial
+import re
 import gym
 import hydra
 import numpy as np
@@ -20,6 +21,31 @@ import mbrl.types
 from mbrl.env.wrappers.multitask_wrapper import MultitaskWrapper
 from mbrl.util.lifelong_learning import make_task_name_to_index_map
 from mbrl.env.reward_functions import DOMAIN_TO_REWARD_FUNCTION
+
+
+def metaworld_make_hidden_goal_env(env_name: str, env_cls):
+    d = {}
+
+    def initialize(env, seed=None, **kwargs):
+        if seed is not None:
+            st0 = np.random.get_state()
+            np.random.seed(seed)
+        super(type(env), env).__init__(**kwargs)
+        env._partially_observable = True
+        env._freeze_rand_vec = False
+        env._set_task_called = True
+        env.reset()
+        env._freeze_rand_vec = True
+        if seed is not None:
+            np.random.set_state(st0)
+
+    d['__init__'] = initialize
+    hg_env_name = re.sub("(^|[-])\s*([a-zA-Z])", lambda p: p.group(0).upper(),
+                         env_name)
+    hg_env_name = hg_env_name.replace("-", "")
+    hg_env_name = '{}GoalHidden'.format(hg_env_name)
+    HiddenGoalEnvCls = type(hg_env_name, (env_cls, ), d)
+    return HiddenGoalEnvCls
 
 
 def make_env(
@@ -45,22 +71,52 @@ def make_env(
         import mbrl.env
         env_name = env_name.split('___')[1]
         term_fn = getattr(mbrl.env.termination_fns, cfg.overrides.term_fn)
-        task_index = env_cfg.task_index
+        no_task = False
         if env_name == 'drawer-open-v2-max':
             from mbrl.env.metaworld_envs import sawyer_drawer_open_v2
-            env = sawyer_drawer_open_v2.SawyerDrawerOpenEnvV2(
-                **env_cfg.env_kwargs)
-            mt1 = metaworld.MT1('drawer-open-v2')
+            # env = sawyer_drawer_open_v2.SawyerDrawerOpenEnvV2(
+            #     **env_cfg.env_kwargs)
+            # mt1 = metaworld.MT1('drawer-open-v2')
+            # from metaworld.envs import ALL_V2_ENVIRONMENTS_GOAL_HIDDEN
+            # drawer_open_goal_hidden_cls = ALL_V2_ENVIRONMENTS_GOAL_HIDDEN[
+            #     'drawer-open-v2-goal-hidden']
+            # env = drawer_open_goal_hidden_cls()
+            env = metaworld_make_hidden_goal_env(
+                env_name, sawyer_drawer_open_v2.SawyerDrawerOpenEnvV2)(
+                    **env_cfg.env_kwargs)
+            no_task = True
         elif env_name == 'drawer-close-v2-max':
             from mbrl.env.metaworld_envs import sawyer_drawer_close_v2
-            env = sawyer_drawer_close_v2.SawyerDrawerCloseEnvV2(
-                **env_cfg.env_kwargs)
-            mt1 = metaworld.MT1('drawer-close-v2')
+            # env = sawyer_drawer_close_v2.SawyerDrawerCloseEnvV2(
+            #     **env_cfg.env_kwargs)
+            # mt1 = metaworld.MT1('drawer-close-v2')
+            # from metaworld.envs import ALL_V2_ENVIRONMENTS_GOAL_HIDDEN
+            # drawer_close_goal_hidden_cls = ALL_V2_ENVIRONMENTS_GOAL_HIDDEN[
+            #     'drawer-close-v2-goal-hidden']
+            # env = drawer_close_goal_hidden_cls()
+            env = metaworld_make_hidden_goal_env(
+                env_name, sawyer_drawer_close_v2.SawyerDrawerCloseEnvV2)(
+                    **env_cfg.env_kwargs)
+            no_task = True
+        elif env_name == 'faucet-open-v2-max':
+            from metaworld.envs import ALL_V2_ENVIRONMENTS_GOAL_HIDDEN
+            faucet_open_goal_hidden_cls = ALL_V2_ENVIRONMENTS_GOAL_HIDDEN[
+                'faucet-open-v2-goal-hidden']
+            env = faucet_open_goal_hidden_cls()
+            no_task = True
+        elif env_name == 'faucet-close-v2-max':
+            from metaworld.envs import ALL_V2_ENVIRONMENTS_GOAL_HIDDEN
+            faucet_close_goal_hidden_cls = ALL_V2_ENVIRONMENTS_GOAL_HIDDEN[
+                'faucet-close-v2-goal-hidden']
+            env = faucet_close_goal_hidden_cls()
+            no_task = True
         else:
             mt1 = metaworld.MT1(env_name)
             env = mt1.train_classes[list(mt1.train_classes)[0]]()
-        task = mt1.train_tasks[task_index]
-        env.set_task(task)
+        if not no_task:
+            task_index = env_cfg.task_index
+            task = mt1.train_tasks[task_index]
+            env.set_task(task)
         reward_fn = DOMAIN_TO_REWARD_FUNCTION[env_name](env)
         env = gym.wrappers.TimeLimit(env,
                                      max_episode_steps=cfg.overrides.get(
@@ -124,7 +180,9 @@ def make_env(
 
 @hydra.main(config_path="conf", config_name="main_lifelong_learning")
 def run(cfg: omegaconf.DictConfig):
-    wandb.init(project='fsrl-mbrl', config=OmegaConf.to_container(cfg))
+    wandb.init(project='fsrl-mbrl',
+               config=OmegaConf.to_container(cfg),
+               settings=wandb.Settings(start_method="fork"))
     lifelong_learning_envs = []
     lifelong_learning_task_names = []
     lifelong_learning_termination_fns = []
@@ -138,6 +196,8 @@ def run(cfg: omegaconf.DictConfig):
         env, term_fn, reward_fn = make_env(env_cfg.env_name, env_cfg.wrappers,
                                            cfg.overrides.learned_rewards, cfg,
                                            env_cfg)
+        print('[main_lifelong_learning:155] i: ', str(i),
+              '; env.observation_space: ', env.observation_space)
         # env = MultitaskWrapper(env, i, num_tasks)
         lifelong_learning_envs.append(env)
         lifelong_learning_task_names.append(env_cfg.task_name)

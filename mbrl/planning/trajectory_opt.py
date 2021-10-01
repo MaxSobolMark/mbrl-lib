@@ -504,6 +504,7 @@ def create_trajectory_optim_agent_for_model(
     model_env: mbrl.models.ModelEnv,
     agent_cfg: omegaconf.DictConfig,
     num_particles: int = 1,
+    planning_mopo_penalty_coeff: float = 0,
 ) -> TrajectoryOptimizerAgent:
     """Utility function for creating a trajectory optimizer agent for a model environment.
 
@@ -525,9 +526,11 @@ def create_trajectory_optim_agent_for_model(
     agent = hydra.utils.instantiate(agent_cfg)
 
     def trajectory_eval_fn(initial_state, action_sequences):
-        return model_env.evaluate_action_sequences(action_sequences,
-                                                   initial_state=initial_state,
-                                                   num_particles=num_particles)
+        return model_env.evaluate_action_sequences(
+            action_sequences,
+            initial_state=initial_state,
+            num_particles=num_particles,
+            mopo_penalty_coeff=planning_mopo_penalty_coeff)
 
     agent.set_trajectory_eval_fn(trajectory_eval_fn)
     return agent

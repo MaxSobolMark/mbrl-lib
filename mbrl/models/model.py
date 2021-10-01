@@ -332,6 +332,7 @@ class Ensemble(Model, abc.ABC):
         deterministic: bool = False,
         rng: Optional[torch.Generator] = None,
         return_variance: bool = False,
+        return_learned_variance: bool = True,
         **kwargs,
     ) -> Tuple[torch.Tensor, ...]:
         """Samples an output of the dynamics model from the modeled Gaussian.

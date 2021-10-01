@@ -151,6 +151,7 @@ class ModelEnv:
         action_sequences: torch.Tensor,
         initial_state: np.ndarray,
         num_particles: int,
+        mopo_penalty_coeff: float = 0,
     ) -> torch.Tensor:
         """Evaluates a batch of action sequences on the model.
 
@@ -181,7 +182,10 @@ class ModelEnv:
             action_batch = torch.repeat_interleave(actions_for_step,
                                                    num_particles,
                                                    dim=0)
-            _, rewards, dones, _ = self.step(action_batch, sample=True)
+            _, rewards, dones, _ = self.step(
+                action_batch,
+                sample=True,
+                mopo_penalty_coeff=mopo_penalty_coeff)
             rewards[terminated] = 0
             terminated |= dones
             total_rewards += rewards

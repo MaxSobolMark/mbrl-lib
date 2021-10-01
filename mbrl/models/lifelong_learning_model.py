@@ -5,7 +5,7 @@
 import pathlib
 import pickle
 import warnings
-from typing import Callable, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 import hydra
 import gtimer as gt
 
@@ -19,6 +19,8 @@ import mbrl.util.math
 from mbrl.util.lifelong_learning import separate_observations_and_task_ids
 
 from .model import Ensemble, LossOutput, Model, UpdateOutput
+from mbrl.types import ModelInput
+from torch.nn import functional as F
 
 MODEL_LOG_FORMAT = [
     ("train_iteration", "I", "int"),
@@ -137,14 +139,32 @@ class LifelongLearningModel():  # Model):
     # def loss(self, *args, **kwargs):
     #     return self._model.loss(*args, **kwargs)
 
-    # def eval_score(self, *args, **kwargs):
-    #     return self._model.eval_score(*args, **kwargs)
+    def eval_score(
+        self,
+        batch: mbrl.types.TransitionBatch,
+        target: Optional[torch.Tensor] = None
+    ) -> Tuple[torch.Tensor, Dict[str, Any]]:
+        assert target is None
+        with torch.no_grad():
+            model_in, target = self._get_model_input_and_target_from_batch(
+                batch)
+            assert model_in.ndim == 2 and target.ndim == 2
+            pred_mean, _ = self.forward(model_in, use_propagation=False)
+            target = target.repeat((self._model.model.num_members, 1, 1))
+            return F.mse_loss(pred_mean, target, reduction="none"), {}
 
     # def update_normalizer(self, *args, **kwargs):
     #     return self._model.update_normalizer(*args, **kwargs)
 
-    # def update(self, *args, **kwargs):
-    #     return self._model.update(*args, **kwargs)
+    def update(
+        self,
+        batch: mbrl.types.TransitionBatch,
+        optimizer: torch.optim.Optimizer,
+        target: Optional[torch.Tensor] = None,
+    ):
+        assert target is None
+        model_in, target = self._get_model_input_and_target_from_batch(batch)
+        return self.model.update(model_in, optimizer, target=target)
 
     # def get_output_and_targets(self, *args, **kwargs):
     #     return self._model.get_output_and_targets(*args, **kwargs)
