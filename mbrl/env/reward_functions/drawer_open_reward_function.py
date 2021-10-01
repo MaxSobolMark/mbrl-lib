@@ -36,7 +36,7 @@ class DrawerOpenRewardFunction(BaseRewardFunction):
             self._env.unwrapped.init_tcp).to(device)) * scale
 
         reward_for_caging = tolerance(
-            torch.norm(gripper_error),
+            torch.norm(gripper_error, dim=-1),
             bounds=(0, 0.01),
             margin=torch.norm(gripper_error_init).to(device),
             sigmoid='long_tail',

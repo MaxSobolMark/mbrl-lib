@@ -95,17 +95,19 @@ class SawyerDrawerCloseEnvV2(SawyerXYZEnv):
         self.sim.model.body_pos[self.model.body_name2id(
             'drawer')] = self.obj_init_pos
         # Set _target_pos to current drawer position (closed)
-        self._target_pos = self.obj_init_pos + np.array([.0, -.16, .09])
+        # self._target_pos = self.obj_init_pos + np.array([.0, -.16, .09])
+        factor = self._task_number / self._num_tasks
+        self._target_pos = self.obj_init_pos + (np.array(
+            [.0, -.16 - factor * self.maxDist, .09]))
         # Pull drawer out all the way and mark its starting position
         self._set_obj_xyz(-self.maxDist)
         self.obj_init_pos = self._get_pos_objects()
 
         # MODIFICATION
-        factor = self._task_number / self._num_tasks
-        self._target_pos = self.obj_init_pos + (np.array(
-            [.0, -.16 - factor * self.maxDist, .09]))
-        self.sim.model.site_pos[self.model.site_name2id(
-            'goal')] = self._target_pos
+        # factor = self._task_number / self._num_tasks
+        # self._target_pos = self.obj_init_pos + (np.array(
+        #     [.0, -.16 - factor * self.maxDist, .09]))
+        # self.data.site_xpos[self.model.site_name2id('goal')] = self._target_pos
 
         return self._get_obs()
 
@@ -114,6 +116,7 @@ class SawyerDrawerCloseEnvV2(SawyerXYZEnv):
 
         tcp = self.tcp_center
         target = self._target_pos.copy()
+        # print('[sawyer_drawer_close_v2:118] target: ', target)
 
         target_to_obj = (obj - target)
         target_to_obj = np.linalg.norm(target_to_obj)
@@ -150,20 +153,3 @@ class SawyerDrawerCloseEnvV2(SawyerXYZEnv):
 
         return (reward, tcp_to_obj, tcp_opened, target_to_obj, object_grasped,
                 in_place)
-
-    def set_task(self, task):
-        self._set_task_called = True
-        data = pickle.loads(task.data)
-        # assert isinstance(self, data['env_cls'])
-        del data['env_cls']
-        self._last_rand_vec = data['rand_vec']
-        self._freeze_rand_vec = True
-        self._last_rand_vec = data['rand_vec']
-        del data['rand_vec']
-        self._partially_observable = data['partially_observable']
-        del data['partially_observable']
-        self._set_task_inner(**data)
-        self.reset()
-
-    def set_task_number(self, task_number):
-        self._task_number = task_number

@@ -7,7 +7,8 @@ class PusherRewardFunction(BaseRewardFunction):
 
     def get_reward(self, observation: torch.Tensor, action: torch.Tensor,
                    device: str):
-        goal_pos = torch.tensor(self._env.ac_goal_pos).to(observation.device)
+        # goal_pos = torch.tensor(self._env.ac_goal_pos).to(observation.device)
+        goal_pos = torch.tensor([0.45, -0.05, -0.323]).to(device)
 
         to_w, og_w = 0.5, 1.25
         tip_pos, obj_pos = observation[:, 14:17], observation[:, 17:20]

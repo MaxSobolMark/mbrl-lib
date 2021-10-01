@@ -234,13 +234,25 @@ def train(
             sac_buffer_capacity = (rollout_length * mbpo_rollout_batch_size *
                                    trains_per_epoch)
             sac_buffer_capacity *= cfg.overrides.num_epochs_to_retain_sac_buffer
-            sac_buffer = maybe_replace_sac_buffer(
-                sac_buffer,
-                sac_buffer_capacity,
-                obs_shape,
-                act_shape,
-                torch.device(cfg.device),
-            )
+            if rollout_length > 0:
+                sac_buffer = maybe_replace_sac_buffer(
+                    sac_buffer,
+                    sac_buffer_capacity,
+                    obs_shape,
+                    act_shape,
+                    torch.device(cfg.device),
+                )
+            elif sac_buffer is None:
+                active_buffer = list(active_task_buffers)[0]
+                sac_buffer = pytorch_sac.ReplayBuffer(obs_shape, act_shape,
+                                                      active_buffer.capacity,
+                                                      torch.device(cfg.device))
+                all_batches = active_buffer.get_all()
+                sac_buffer.add_batch(all_batches.obs, all_batches.act,
+                                     np.reshape(all_batches.rewards, [-1, 1]),
+                                     all_batches.next_obs,
+                                     np.reshape(all_batches.dones, [-1, 1]),
+                                     np.reshape(all_batches.dones, [-1, 1]))
             step_info = None
             while not done:
                 # --------------- Model Training -----------------
@@ -258,6 +270,10 @@ def train(
                 next_obs, reward, done, step_info = mbrl.util.common.step_env_and_add_to_buffer(
                     lifelong_learning_envs[task_i], obs, agent, {},
                     task_replay_buffers[task_i])
+                # If we're using SAC (rollout length 0) add experience to sac_buffer
+                if rollout_length == 0:
+                    sac_buffer.add(obs, step_info['action_taken'], reward,
+                                   next_obs, done, done)
                 gt.stamp('step_env')
 
                 # Rollout model and store imagined trajectories for MBPO.
@@ -279,15 +295,16 @@ def train(
                 real_batches_for_rollout = (
                     mbrl.util.replay_buffer.concatenate_batches(
                         real_batches_for_rollout))
-                rollout_model_and_populate_sac_buffer(
-                    model_env,
-                    None,
-                    sac_agent,
-                    sac_buffer,
-                    cfg.algorithm.sac_samples_action,
-                    rollout_length,
-                    mbpo_rollout_batch_size,
-                    batch=real_batches_for_rollout)
+                if rollout_length > 0:
+                    rollout_model_and_populate_sac_buffer(
+                        model_env,
+                        None,
+                        sac_agent,
+                        sac_buffer,
+                        cfg.algorithm.sac_samples_action,
+                        rollout_length,
+                        mbpo_rollout_batch_size,
+                        batch=real_batches_for_rollout)
                 if debug_mode:
                     print(f"Epoch: {epoch}. "
                           f"SAC buffer size: {len(sac_buffer)}. "
@@ -296,7 +313,12 @@ def train(
                 # SAC Agent Training
                 for _ in range(cfg.overrides.num_sac_updates_per_step):
                     if ((env_steps + 1) % cfg.overrides.sac_updates_every_steps
-                            != 0 or len(sac_buffer) < mbpo_rollout_batch_size):
+                            != 0 or (len(sac_buffer) < mbpo_rollout_batch_size)
+                            and rollout_length > 0):
+                        print('[fsrl:304] len(sac_buffer): ', len(sac_buffer))
+                        print('[fsrl:305] not training the SAC Agent!')
+                        print('[fsrl:306] mbpo_rollout_batch_size: ',
+                              mbpo_rollout_batch_size)
                         break  # only update every once in a while
                     sac_agent.update(sac_buffer, logger, updates_made)
                     updates_made += 1
@@ -315,6 +337,18 @@ def train(
 
             # Episode finished
             # TODO: add support for early termination.
+            test_avg_returns = {}
+            # for i, test_env in enumerate(evaluation_environments):
+            #     test_avg_returns['test_avg_returns_task_' +
+            #                      str(i)] = (evaluate(
+            #                          test_env, agent,
+            #                          cfg.algorithm.num_eval_episodes,
+            #                          video_recorder))
+            #     video_recorder.save(f"{current_trial}_task_{i}.mp4")
+            test_avg_returns['test_avg_returns'] = evaluate(
+                evaluation_environments[task_i], agent,
+                cfg.algorithm.num_eval_episodes, video_recorder)
+            video_recorder.save(f"{current_trial}_task_{i}.mp4")
             if logger is not None:
                 if policy_to_use == PolicyType.COMBINED:
                     active_policy = agent.get_active_policy()
@@ -331,14 +365,11 @@ def train(
                     'active_policy': active_policy,
                 }
                 results_dict.update(step_info)
+                results_dict.update(test_avg_returns)
                 logger.log_data(mbrl.constants.RESULTS_LOG_NAME, results_dict)
                 if hasattr(agent, 'get_episode_diagnostics'):
                     logger.log_data('policy_diagnostics',
                                     agent.get_episode_diagnostics())
-            for i, test_env in enumerate(evaluation_environments):
-                evaluate(test_env, sac_agent, cfg.algorithm.num_eval_episodes,
-                         video_recorder)
-                video_recorder.save(f"{current_trial}_task_{i}.mp4")
             torch.save(sac_agent.critic.state_dict(),
                        os.path.join(work_dir, "critic.pth"))
             torch.save(sac_agent.actor.state_dict(),

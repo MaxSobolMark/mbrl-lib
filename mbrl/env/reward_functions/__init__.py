@@ -2,8 +2,8 @@ from typing import Callable, Dict, List, Tuple
 from .base_reward_function import BaseRewardFunction
 from .drawer_close_reward_function import DrawerCloseRewardFunction
 from .drawer_open_reward_function import DrawerOpenRewardFunction
-# from .faucet_close_reward_function import FaucetCloseRewardFunction
-# from .faucet_open_reward_function import FaucetOpenRewardFunction
+from .faucet_close_reward_function import FaucetCloseRewardFunction
+from .faucet_open_reward_function import FaucetOpenRewardFunction
 # from .reacher_3d_reward_function import Reacher3DRewardFunction
 from .half_cheetah_reward_function import HalfCheetahRewardFunction
 from .half_cheetah_backwards_reward_function import (
@@ -41,10 +41,10 @@ DOMAIN_TO_REWARD_FUNCTION = {  # PrefixDict({
     DrawerOpenRewardFunction,
     'drawer-open-v2-max':
     DrawerOpenRewardFunction,
-    # 'faucet-close-v2':
-    # FaucetCloseRewardFunction,
-    # 'faucet-open-v2':
-    # FaucetOpenRewardFunction,
+    'faucet-close-v2-max':
+    FaucetCloseRewardFunction,
+    'faucet-open-v2-max':
+    FaucetOpenRewardFunction,
     'pets_reacher':
     reacher,
     #Reacher3DRewardFunction,
