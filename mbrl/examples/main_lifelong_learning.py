@@ -34,6 +34,7 @@ def metaworld_make_hidden_goal_env(env_name: str, env_cls):
         env._partially_observable = True
         env._freeze_rand_vec = False
         env._set_task_called = True
+        env.random_init = False
         env.reset()
         env._freeze_rand_vec = True
         if seed is not None:
@@ -99,16 +100,24 @@ def make_env(
                     **env_cfg.env_kwargs)
             no_task = True
         elif env_name == 'faucet-open-v2-max':
-            from metaworld.envs import ALL_V2_ENVIRONMENTS_GOAL_HIDDEN
-            faucet_open_goal_hidden_cls = ALL_V2_ENVIRONMENTS_GOAL_HIDDEN[
-                'faucet-open-v2-goal-hidden']
-            env = faucet_open_goal_hidden_cls()
+            # from metaworld.envs import ALL_V2_ENVIRONMENTS_GOAL_HIDDEN
+            # faucet_open_goal_hidden_cls = ALL_V2_ENVIRONMENTS_GOAL_HIDDEN[
+            #     'faucet-open-v2-goal-hidden']
+            # env = faucet_open_goal_hidden_cls()
+            from mbrl.env.metaworld_envs import sawyer_faucet_open_v2
+            env = metaworld_make_hidden_goal_env(
+                env_name, sawyer_faucet_open_v2.SawyerFaucetOpenEnvV2)(
+                    **env_cfg.env_kwargs)
             no_task = True
         elif env_name == 'faucet-close-v2-max':
-            from metaworld.envs import ALL_V2_ENVIRONMENTS_GOAL_HIDDEN
-            faucet_close_goal_hidden_cls = ALL_V2_ENVIRONMENTS_GOAL_HIDDEN[
-                'faucet-close-v2-goal-hidden']
-            env = faucet_close_goal_hidden_cls()
+            # from metaworld.envs import ALL_V2_ENVIRONMENTS_GOAL_HIDDEN
+            # faucet_close_goal_hidden_cls = ALL_V2_ENVIRONMENTS_GOAL_HIDDEN[
+            #     'faucet-close-v2-goal-hidden']
+            # env = faucet_close_goal_hidden_cls()
+            from mbrl.env.metaworld_envs import sawyer_faucet_close_v2
+            env = metaworld_make_hidden_goal_env(
+                env_name, sawyer_faucet_close_v2.SawyerFaucetCloseEnvV2)(
+                    **env_cfg.env_kwargs)
             no_task = True
         else:
             mt1 = metaworld.MT1(env_name)

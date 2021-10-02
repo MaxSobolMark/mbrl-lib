@@ -8,6 +8,8 @@ envs:
     wrappers: []
     task_name: "close_task"
     reward_fn: "metaworld_faucet_close"
+    env_kwargs:
+      - closing_angle: 0
   -
     env_name: "metaworld___faucet-open-v2-max"
     wrappers: []

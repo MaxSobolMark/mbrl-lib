@@ -1,27 +1,29 @@
 # @package _group_
 env: "faucet_lifelong_learning_pets"
-num_distinct_envs: 2
+num_distinct_envs: 1 #2
 envs:
-  -
-    env_name: "metaworld___faucet-open-v2-max"
-    wrappers: []
-    task_name: "open_task"
-    reward_fn: "metaworld_faucet_open"
-  -
-    env_name: "metaworld___faucet-close-v2-max"
-    wrappers: []
-    task_name: "close_task"
-    reward_fn: "metaworld_faucet_close"
-  -
-    env_name: "metaworld___faucet-open-v2-max"
-    wrappers: []
-    task_name: "open_task"
-    reward_fn: "metaworld_faucet_open"
+  # -
+  #   env_name: "metaworld___faucet-open-v2-max"
+  #   wrappers: []
+  #   task_name: "open_task"
+  #   reward_fn: "metaworld_faucet_open"
   -
     env_name: "metaworld___faucet-close-v2-max"
     wrappers: []
     task_name: "close_task"
     reward_fn: "metaworld_faucet_close"
+    env_kwargs:
+      closing_angle: 0
+  # -
+  #   env_name: "metaworld___faucet-open-v2-max"
+  #   wrappers: []
+  #   task_name: "open_task"
+  #   reward_fn: "metaworld_faucet_open"
+  # -
+  #   env_name: "metaworld___faucet-close-v2-max"
+  #   wrappers: []
+  #   task_name: "close_task"
+  #   reward_fn: "metaworld_faucet_close"
 
 term_fn: "no_termination"
 policy_to_use: "CEM_PLANNING"

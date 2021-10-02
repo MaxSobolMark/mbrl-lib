@@ -77,7 +77,7 @@ forward_postprocess_fn: None
 
 # MBPO Config
 effective_model_rollouts_per_step: 400
-rollout_schedule: [20, 150, 1, 15]
+rollout_schedule: [20, 150, 1, 1]
 num_sac_updates_per_step: 20
 sac_updates_every_steps: 1
 num_epochs_to_retain_sac_buffer: 1
