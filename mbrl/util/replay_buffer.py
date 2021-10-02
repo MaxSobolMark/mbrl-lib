@@ -475,6 +475,7 @@ class ReplayBuffer:
         if self.trajectory_indices is None or len(
                 self.trajectory_indices) == 0:
             return None
+        n = min(n, len(self.trajectory_indices))
         indices = [
             np.arange(trajectory_index[0], trajectory_index[1])
             for trajectory_index in self.trajectory_indices[-n:]

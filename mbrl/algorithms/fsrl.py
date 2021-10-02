@@ -173,7 +173,8 @@ def train(
     planning_agent = mbrl.planning.create_trajectory_optim_agent_for_model(
         model_env,
         cfg.algorithm.agent,
-        num_particles=cfg.algorithm.num_particles)
+        num_particles=cfg.algorithm.num_particles,
+        planning_mopo_penalty_coeff=cfg.algorithm.planning_mopo_penalty_coeff)
     steps_trial = 0
     if policy_to_use == PolicyType.CEM_PLANNING:
         agent = planning_agent
@@ -216,6 +217,7 @@ def train(
     #     for i in range(cfg.overrides.num_steps //
     #                    len(lifelong_learning_task_names)):
     for i in range(len(lifelong_learning_task_names)):
+        # HERE add check
         env_steps_this_task = 0
         task_i = task_name_to_task_index[lifelong_learning_task_names[i]]
         active_task_buffers.add(task_replay_buffers[task_i])
@@ -304,7 +306,9 @@ def train(
                         cfg.algorithm.sac_samples_action,
                         rollout_length,
                         mbpo_rollout_batch_size,
-                        batch=real_batches_for_rollout)
+                        batch=real_batches_for_rollout,
+                        mopo_penalty_coeff=cfg.overrides.
+                        policy_mopo_penalty_coeff)
                 if debug_mode:
                     print(f"Epoch: {epoch}. "
                           f"SAC buffer size: {len(sac_buffer)}. "

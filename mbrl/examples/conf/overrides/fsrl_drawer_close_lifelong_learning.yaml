@@ -96,5 +96,5 @@ sac_hidden_dim: 256
 # in ["last_n_episodes", "current_observation"]
 returns_expectation_calculation_method: "current_observation"
 returns_expectation_n_episodes: 3
-
+policy_mopo_penalty_coeff: 0
 planning_mopo_penalty_coeff: 0
