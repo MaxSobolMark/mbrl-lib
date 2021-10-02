@@ -86,9 +86,12 @@ class SACAgent(Agent):
         self.critic.train(training)
 
     def add_new_task(self):
-        self.actor.new_task().to(self.device)
-        self.critic.new_task().to(self.device)
-        self.critic_target.new_task().to(self.device)
+        self.actor.new_task()
+        self.critic.new_task()
+        self.critic_target.new_task()
+        self.actor.to(self.device)
+        self.critic.to(self.device)
+        self.critic_target.to(self.device)
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(),
                                                 lr=self.actor_lr,
                                                 betas=self.actor_betas)
