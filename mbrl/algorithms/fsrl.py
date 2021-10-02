@@ -215,6 +215,8 @@ def train(
     #     for i in range(cfg.overrides.num_steps //
     #                    len(lifelong_learning_task_names)):
     for i in range(len(lifelong_learning_task_names)):
+        if i != 0:
+            sac_agent.add_new_task()
         env_steps_this_task = 0
         task_i = task_name_to_task_index[lifelong_learning_task_names[i]]
         active_task_buffers.add(task_replay_buffers[task_i])
@@ -278,22 +280,23 @@ def train(
                 # Rollout model and store imagined trajectories for MBPO.
                 # TODO!!!!: make replay buffer sample equally from all tasks.
                 num_active_buffers = len(active_task_buffers)
-                real_batches_for_rollout = [
-                    replay_buffer.sample(mbpo_rollout_batch_size //
-                                         num_active_buffers)
-                    for replay_buffer in active_task_buffers
-                ]
+                real_batches_for_rollout = task_replay_buffers[task_i].sample(mbpo_rollout_batch_size)
+                #real_batches_for_rollout = [
+                #    replay_buffer.sample(mbpo_rollout_batch_size //
+                 #                        num_active_buffers)
+                  #  for replay_buffer in active_task_buffers
+                #]
                 # mbpo_rollout_batch_size might not be divisible by the active buffers
                 # so get remaining samples
-                if mbpo_rollout_batch_size % num_active_buffers != 0:
-                    real_batches_for_rollout.append(
-                        task_replay_buffers[task_i].sample(
-                            mbpo_rollout_batch_size -
-                            mbpo_rollout_batch_size // num_active_buffers *
-                            num_active_buffers))
-                real_batches_for_rollout = (
-                    mbrl.util.replay_buffer.concatenate_batches(
-                        real_batches_for_rollout))
+                #if mbpo_rollout_batch_size % num_active_buffers != 0:
+                #    real_batches_for_rollout.append(
+                #        task_replay_buffers[task_i].sample(
+                #            mbpo_rollout_batch_size -
+                #            mbpo_rollout_batch_size // num_active_buffers *
+                #            num_active_buffers))
+                #real_batches_for_rollout = (
+                #    mbrl.util.replay_buffer.concatenate_batches(
+                #        real_batches_for_rollout))
                 if rollout_length > 0:
                     rollout_model_and_populate_sac_buffer(
                         model_env,
@@ -381,7 +384,7 @@ def train(
             gt.stamp('finished_step')
         # task_loop.exit()
         gt.stamp('finished_task')
-        sac_agent.add_new_task()
+
     # loop.exit()
     print(gt.report(include_itrs=False))
     return np.float32(max_total_reward)

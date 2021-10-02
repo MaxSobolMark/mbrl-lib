@@ -132,6 +132,7 @@ class PNNDiagGaussianActor(nn.Module):
         return dist
 
     def new_task(self):
+        self.policy.freeze_columns()
         self.policy.new_task(self.sizes)
         print('actor new task added')
 

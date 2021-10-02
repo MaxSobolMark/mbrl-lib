@@ -58,16 +58,20 @@ class SACAgent(Agent):
         self.target_entropy = target_entropy if target_entropy else -action_dim
 
         # adding columns for the first task
+        self.actor_lr = actor_lr
+        self.actor_betas = actor_betas
+        self.critic_lr = critic_lr
+        self.critic_betas = critic_betas
         self.add_new_task()
 
         # optimizers
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(),
-                                                lr=actor_lr,
-                                                betas=actor_betas)
+                                                lr=self.actor_lr,
+                                                betas=self.actor_betas)
 
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(),
-                                                 lr=critic_lr,
-                                                 betas=critic_betas)
+                                                 lr=self.critic_lr,
+                                                 betas=self.critic_betas)
 
         self.log_alpha_optimizer = torch.optim.Adam([self.log_alpha],
                                                     lr=alpha_lr,
@@ -85,6 +89,12 @@ class SACAgent(Agent):
         self.actor.new_task()
         self.critic.new_task()
         self.critic_target.new_task()
+        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(),
+                                                lr=self.actor_lr,
+                                                betas=self.actor_betas)
+        self.critic_optimizer = torch.optim.Adam(self.critic.parameters(),
+                                                 lr=self.critic_lr,
+                                                 betas=self.critic_betas)
 
     @property
     def alpha(self):

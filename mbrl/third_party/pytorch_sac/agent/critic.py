@@ -61,6 +61,8 @@ class PNNDoubleQCritic(nn.Module):
         return q1, q2
 
     def new_task(self):
+        self.Q1.freeze_columns()
+        self.Q2.freeze_columns()
         self.Q1.new_task(self.sizes)
         self.Q2.new_task(self.sizes)
         print('critic new task added')
