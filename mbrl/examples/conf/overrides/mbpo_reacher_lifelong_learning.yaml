@@ -102,6 +102,7 @@ envs:
       task_id: 9
       hide_goal: true
 
+num_distinct_envs: 5
 term_fn: "no_termination"
 policy_to_use: "EXPLICIT_POLICY"
 learned_rewards: true

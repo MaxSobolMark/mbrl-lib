@@ -94,7 +94,6 @@ def train(
     mbrl.planning.complete_agent_cfg(lifelong_learning_envs[0],
                                      cfg.algorithm.sac_agent)
     sac_agent = hydra.utils.instantiate(cfg.algorithm.sac_agent)
-
     save_video = cfg.get("save_video", False)
     video_recorder = pytorch_sac.VideoRecorder(
         work_dir if save_video else None)
@@ -382,6 +381,7 @@ def train(
             gt.stamp('finished_step')
         # task_loop.exit()
         gt.stamp('finished_task')
+        sac_agent.add_new_task()
     # loop.exit()
     print(gt.report(include_itrs=False))
     return np.float32(max_total_reward)
