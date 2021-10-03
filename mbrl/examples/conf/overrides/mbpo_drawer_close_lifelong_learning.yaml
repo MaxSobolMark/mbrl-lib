@@ -91,3 +91,6 @@ sac_critic_target_update_frequency: 4
 sac_target_entropy: -3
 sac_hidden_depth: 2
 sac_hidden_dim: 256
+
+planning_mopo_penalty_coeff: 0
+policy_mopo_penalty_coeff: 0

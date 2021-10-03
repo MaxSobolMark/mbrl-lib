@@ -40,6 +40,8 @@ class TanhTransform(pyd.transforms.Transform):
 
 class SquashedNormal(pyd.transformed_distribution.TransformedDistribution):
     def __init__(self, loc, scale):
+        loc = torch.nan_to_num(loc, nan=0., posinf=1., neginf=-1.)
+        scale = torch.nan_to_num(scale, nan=0.0001, posinf=1., neginf=0.0001)
         self.loc = loc
         self.scale = scale
 
@@ -47,8 +49,6 @@ class SquashedNormal(pyd.transformed_distribution.TransformedDistribution):
         #     ok = pyd.Normal.arg_constraints['loc'].check(loc)
         # except ValueError:
         #     print('[actor.py:49] ASDASDASD loc: ', loc)
-        loc = torch.nan_to_num(loc, nan=0., posinf=-1., neginf=1.)
-        scale = torch.nan_to_num(scale, nan=0., posinf=-1., neginf=1.)
 
         # if (~ok).any():
         #     bad_elements = loc[~ok]
