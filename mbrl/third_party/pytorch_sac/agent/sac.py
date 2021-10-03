@@ -86,6 +86,8 @@ class SACAgent(Agent):
         self.critic.train(training)
 
     def add_new_task(self):
+        print('adding new task? nothing has been done! \n\n')
+        '''
         self.actor.new_task()
         self.critic.new_task()
         self.critic_target.new_task()
@@ -98,7 +100,7 @@ class SACAgent(Agent):
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(),
                                                  lr=self.critic_lr,
                                                  betas=self.critic_betas)
-
+        '''
     @property
     def alpha(self):
         return self.log_alpha.exp()
