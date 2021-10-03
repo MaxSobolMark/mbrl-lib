@@ -128,7 +128,10 @@ class ModelEnv:
                        self.reward_fn(actions, next_observs))
             if mopo_penalty_coeff != 0.:
                 stds = torch.sqrt(variances)
-                penalty, _ = torch.max(torch.norm(stds, dim=-1), dim=0)
+                if len(stds.shape) == 3:
+                    penalty, _ = torch.max(torch.norm(stds, dim=-1), dim=0)
+                else:
+                    penalty = torch.norm(stds, dim=-1)
                 penalty = penalty[:, None]
                 assert penalty.shape == rewards.shape
                 unpenalized_rewards = rewards
