@@ -129,7 +129,7 @@ class ModelEnv:
             if mopo_penalty_coeff != 0.:
                 stds = torch.sqrt(variances)
                 penalty, _ = torch.max(torch.norm(stds, dim=-1), dim=0)
-q                penalty = penalty[:, None]
+                penalty = penalty[:, None]
                 assert penalty.shape == rewards.shape
                 unpenalized_rewards = rewards
                 rewards = rewards - mopo_penalty_coeff * penalty
