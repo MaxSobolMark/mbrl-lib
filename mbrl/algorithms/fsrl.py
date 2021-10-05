@@ -205,6 +205,9 @@ def train(
     #     for i in range(cfg.overrides.num_steps //
     #                    len(lifelong_learning_task_names)):
     for i in range(len(lifelong_learning_task_names)):
+        if i != 0:
+            print('adding a new task')
+            sac_agent.add_new_task()
         env_steps_this_task = 0
         task_i = task_name_to_task_index[lifelong_learning_task_names[i]]
         active_task_buffers.add(task_replay_buffers[task_i])
@@ -251,6 +254,8 @@ def train(
                 # Rollout model and store imagined trajectories for MBPO.
                 # TODO!!!!: make replay buffer sample equally from all tasks.
                 num_active_buffers = len(active_task_buffers)
+                real_batches_for_rollout = task_replay_buffers[task_i].sample(mbpo_rollout_batch_size)
+                '''
                 real_batches_for_rollout = [
                     replay_buffer.sample(mbpo_rollout_batch_size //
                                          num_active_buffers)
@@ -267,6 +272,7 @@ def train(
                 real_batches_for_rollout = (
                     mbrl.util.replay_buffer.concatenate_batches(
                         real_batches_for_rollout))
+                '''
                 rollout_model_and_populate_sac_buffer(
                     model_env,
                     None,

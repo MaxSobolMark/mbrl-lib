@@ -54,14 +54,14 @@ sac_agent:
   target_entropy: ${overrides.sac_target_entropy}
 
 double_q_critic:
-  _target_: mbrl.third_party.pytorch_sac.agent.critic.DoubleQCritic
+  _target_: mbrl.third_party.pytorch_sac.agent.critic.PNNDoubleQCritic
   obs_dim: ${algorithm.sac_agent.obs_dim}
   action_dim: ${algorithm.sac_agent.action_dim}
   hidden_dim: 1024
   hidden_depth: ${overrides.sac_hidden_depth}
 
 diag_gaussian_actor:
-  _target_: mbrl.third_party.pytorch_sac.agent.actor.DiagGaussianActor
+  _target_: mbrl.third_party.pytorch_sac.agent.actor.PNNDiagGaussianActor
   obs_dim: ${algorithm.sac_agent.obs_dim}
   action_dim: ${algorithm.sac_agent.action_dim}
   hidden_depth: ${overrides.sac_hidden_depth}
