@@ -1,0 +1,9 @@
+--qos=normal
+--time=48:00:00
+--cpus-per-task=4
+--mem=20G
+--gres=gpu:1
+--output=$1-%j.out
+--error=$1-%j.err
+--mail-user=maxsobolmark@stanford.edu
+--mail-type=ALL

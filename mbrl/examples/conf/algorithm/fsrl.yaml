@@ -14,6 +14,7 @@ random_initial_explore: false
 num_eval_episodes: 1
 
 num_particles: 20
+planning_mopo_penalty_coeff: ${overrides.planning_mopo_penalty_coeff}
 
 # --------------------------------------------
 #          Planning Agent configuration

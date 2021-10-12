@@ -5,11 +5,12 @@
 import pathlib
 import pickle
 import warnings
-from typing import Callable, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 import hydra
 import gtimer as gt
 
 import numpy as np
+import omegaconf
 import torch
 
 import mbrl.models.util as model_util
@@ -18,6 +19,8 @@ import mbrl.util.math
 from mbrl.util.lifelong_learning import separate_observations_and_task_ids
 
 from .model import Ensemble, LossOutput, Model, UpdateOutput
+from mbrl.types import ModelInput
+from torch.nn import functional as F
 
 MODEL_LOG_FORMAT = [
     ("train_iteration", "I", "int"),
@@ -44,6 +47,7 @@ class LifelongLearningModel():  # Model):
         num_tasks: int,
         obs_shape: Tuple[int, ...],
         act_shape: Tuple[int, ...],
+        cfg: omegaconf.DictConfig,
         observe_task_id: bool = False,
         forward_postprocess_fn: Callable[[
             torch.Tensor, torch.Tensor, torch.Tensor, torch.nn.parameter.
@@ -56,6 +60,7 @@ class LifelongLearningModel():  # Model):
         self._num_tasks = num_tasks
         self._obs_shape = obs_shape
         self._act_shape = act_shape
+        self._cfg = cfg
         self._observe_task_id = observe_task_id
         self._forward_postprocess_fn = forward_postprocess_fn
         self.device = model.device

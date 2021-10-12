@@ -109,6 +109,7 @@ def train(
         num_tasks,
         obs_shape,
         act_shape,
+        cfg,
         observe_task_id=cfg.overrides.observe_task_id,
         forward_postprocess_fn=forward_postprocess_fn,
     )
@@ -162,7 +163,8 @@ def train(
     planning_agent = mbrl.planning.create_trajectory_optim_agent_for_model(
         model_env,
         cfg.algorithm.agent,
-        num_particles=cfg.algorithm.num_particles)
+        num_particles=cfg.algorithm.num_particles,
+        planning_mopo_penalty_coeff=cfg.algorithm.planning_mopo_penalty_coeff)
     steps_trial = 0
     if policy_to_use == PolicyType.CEM_PLANNING:
         agent = planning_agent
@@ -267,15 +269,18 @@ def train(
                 real_batches_for_rollout = (
                     mbrl.util.replay_buffer.concatenate_batches(
                         real_batches_for_rollout))
-                rollout_model_and_populate_sac_buffer(
-                    model_env,
-                    None,
-                    sac_agent,
-                    sac_buffer,
-                    cfg.algorithm.sac_samples_action,
-                    rollout_length,
-                    mbpo_rollout_batch_size,
-                    batch=real_batches_for_rollout)
+                if rollout_length > 0:
+                    rollout_model_and_populate_sac_buffer(
+                        model_env,
+                        None,
+                        sac_agent,
+                        sac_buffer,
+                        cfg.algorithm.sac_samples_action,
+                        rollout_length,
+                        mbpo_rollout_batch_size,
+                        batch=real_batches_for_rollout,
+                        mopo_penalty_coeff=cfg.overrides.
+                        policy_mopo_penalty_coeff)
                 if debug_mode:
                     print(f"Epoch: {epoch}. "
                           f"SAC buffer size: {len(sac_buffer)}. "
