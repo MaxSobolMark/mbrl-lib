@@ -36,6 +36,7 @@ class CombinedAgent(Agent):
             current_task_index: int,
             timestep_in_epoch: int,
             current_task_replay_buffer: ReplayBuffer,
+            env_steps_this_task: int,
             return_plan: bool = False,
             **kwargs) -> np.ndarray:
         """Issues an action given an observation.
@@ -54,37 +55,46 @@ class CombinedAgent(Agent):
         if timestep_in_epoch == 0:
             print('[combined_agent:55] current_task_index: ',
                   current_task_index)
-            returns_expectation_calculation_method = (
-                self._cfg.overrides.returns_expectation_calculation_method)
-            if returns_expectation_calculation_method == 'last_n_episodes':
-                last_n_trajectories = (
-                    current_task_replay_buffer.get_last_n_trajectories(
-                        self._cfg.overrides.returns_expectation_n_episodes))
-                if last_n_trajectories is not None:
-                    obs, *_ = last_n_trajectories.astuple()
-            # task_episodes = current_task_replay_buffer.get_all()
-            # TODO: DONT EVALUATE WITH EVERYTHING IN THE REPLAY BUFFER
-            planner_action_sequence = self.planning_agent.plan(obs)[np.newaxis]
-            print('[combined_agent:49] planner_action_sequence.shape: ',
-                  planner_action_sequence.shape)
-            planner_returns_expectation = (
-                self._model_env.evaluate_action_sequences(
-                    torch.Tensor(planner_action_sequence).to(self._cfg.device),
-                    initial_state=obs,
-                    num_particles=self._cfg.algorithm.num_particles))
-            explicit_policy_returns_expectation = self._model_env.evaluate_agent(
-                self.sac_agent, obs, self._cfg.overrides.planning_horizon,
-                self._cfg.algorithm.num_particles)
+            if self._cfg.overrides.get('naive_switching', False):
+                if env_steps_this_task < self._cfg.overrides.trial_length * 3:
+                    self._policy_to_use_current_epoch = 'planner'
+                else:
+                    self._policy_to_use_current_epoch = 'explicit_policy'
+            else:
+                returns_expectation_calculation_method = (
+                    self._cfg.overrides.returns_expectation_calculation_method)
+                if returns_expectation_calculation_method == 'last_n_episodes':
+                    last_n_trajectories = (
+                        current_task_replay_buffer.get_last_n_trajectories(
+                            self._cfg.overrides.returns_expectation_n_episodes)
+                    )
+                    if last_n_trajectories is not None:
+                        obs, *_ = last_n_trajectories.astuple()
+                # task_episodes = current_task_replay_buffer.get_all()
+                # TODO: DONT EVALUATE WITH EVERYTHING IN THE REPLAY BUFFER
+                planner_action_sequence = self.planning_agent.plan(obs)[
+                    np.newaxis]
+                print('[combined_agent:49] planner_action_sequence.shape: ',
+                      planner_action_sequence.shape)
+                planner_returns_expectation = (
+                    self._model_env.evaluate_action_sequences(
+                        torch.Tensor(planner_action_sequence).to(
+                            self._cfg.device),
+                        initial_state=obs,
+                        num_particles=self._cfg.algorithm.num_particles))
+                explicit_policy_returns_expectation = self._model_env.evaluate_agent(
+                    self.sac_agent, obs, self._cfg.overrides.planning_horizon,
+                    self._cfg.algorithm.num_particles)
 
-            self._policy_to_use_current_epoch = (
-                'planner' if planner_returns_expectation >
-                explicit_policy_returns_expectation else 'explicit_policy')
-            self._diagnostics = {
-                'planner_returns_expectation':
-                planner_returns_expectation,
-                'explicit_policy_returns_expectation':
-                explicit_policy_returns_expectation,
-            }
+                self._policy_to_use_current_epoch = (
+                    'planner' if planner_returns_expectation >
+                    explicit_policy_returns_expectation else 'explicit_policy')
+                self._diagnostics = {
+                    'planner_returns_expectation':
+                    planner_returns_expectation,
+                    'explicit_policy_returns_expectation':
+                    explicit_policy_returns_expectation,
+                }
 
         if self._policy_to_use_current_epoch == 'planner':
             if return_plan:

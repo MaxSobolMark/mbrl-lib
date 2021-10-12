@@ -176,6 +176,7 @@ def train(
         num_particles=cfg.algorithm.num_particles,
         planning_mopo_penalty_coeff=cfg.algorithm.planning_mopo_penalty_coeff)
     steps_trial = 0
+    env_steps_this_task = 0
     if policy_to_use == PolicyType.CEM_PLANNING:
         agent = planning_agent
     elif policy_to_use == PolicyType.EXPLICIT_POLICY:
@@ -191,6 +192,7 @@ def train(
                 current_task_index=task_i,
                 timestep_in_epoch=steps_trial,
                 current_task_replay_buffer=task_replay_buffers[task_i],
+                env_steps_this_task=env_steps_this_task,
                 **kwargs)
 
         agent.act = act_wrapper

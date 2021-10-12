@@ -1,6 +1,7 @@
 # @package _group_
 policy_to_use: "EXPLICIT_POLICY"
 env: "pets_halfcheetah"
+num_distinct_envs: 3
 envs:
   -
     env_name: "pets_halfcheetah"
