@@ -57,6 +57,7 @@ class SACAgent(Agent):
         # default target entropy to -|A|
         self.target_entropy = target_entropy if target_entropy else -action_dim
 
+
         # optimizers
         self.actor_lr = actor_lr
         self.actor_betas = actor_betas
@@ -85,9 +86,9 @@ class SACAgent(Agent):
 
     def add_new_task(self):
         self.actor.new_task()
+        self.actor.to(self.device)
         self.critic.new_task()
         self.critic_target.new_task()
-        self.actor.to(self.device)
         self.critic.to(self.device)
         self.critic_target.to(self.device)
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(),

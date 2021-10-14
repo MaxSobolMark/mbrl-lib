@@ -94,10 +94,10 @@ class DiagGaussianActor(nn.Module):
 
 
 class PNNDiagGaussianActor(nn.Module):
-    def __init__(self, obs_dim, action_dim, hidden_dim, hidden_depth, log_std_bounds):
+    def __init__(self, obs_dim, action_dim, hidden_dim, hidden_depth, log_std_bounds, device):
         super().__init__()
         # self.sizes = [obs_dim, hidden_dim, hidden_dim, 2 * action_dim]
-        self.policy = PNN(obs_dim, hidden_dim, 2 * action_dim)
+        self.policy = PNN(obs_dim, hidden_dim, 2 * action_dim, device)
         self.log_std_bounds = log_std_bounds
         self.outputs = dict()
         self.apply(utils.weight_init)

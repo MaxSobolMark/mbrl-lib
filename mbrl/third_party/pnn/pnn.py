@@ -4,8 +4,10 @@ import torch.nn.functional as F
 
 
 class PNNColumn(nn.Module):
-    def __init__(self, n_tasks, input_size, hidden_size, output_size):
+    def __init__(self, n_tasks, input_size, hidden_size, output_size, device):
         super(PNNColumn, self).__init__()
+        print('device is ', device)
+        self.device = device
         self.n_tasks = n_tasks
         self.sizes = [hidden_size, output_size]
         self.hidden_size = hidden_size
@@ -38,7 +40,7 @@ class PNNColumn(nn.Module):
         y = self.w[0](x)
         outputs[self.n_tasks][0] = y.detach()
         for layer in range(self.n_layers-1):
-            u_out = torch.zeros(batch_size, self.sizes[layer])
+            u_out = torch.zeros(batch_size, self.sizes[layer], device=self.device)
             for k in range(self.n_tasks):
                 v_out = self.v[k][layer](self.alpha[k][layer] * (outputs[k][layer]))
                 u_out += self.u[k][layer](F.relu(v_out))
@@ -59,8 +61,9 @@ class PNNColumn(nn.Module):
 
 
 class PNN(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
+    def __init__(self, input_size, hidden_size, output_size, device='cpu'):
         super(PNN, self).__init__()
+        self.device = device
         self.input_size = input_size
         self.output_size = output_size
         self.hidden_size = hidden_size
@@ -70,7 +73,7 @@ class PNN(nn.Module):
     def new_task(self):
         for i in range(self.n_tasks):
             self.columns[i].freeze()
-        self.columns.append(PNNColumn(self.n_tasks, self.input_size, self.hidden_size, self.output_size))
+        self.columns.append(PNNColumn(self.n_tasks, self.input_size, self.hidden_size, self.output_size, self.device))
         self.n_tasks += 1
 
     def forward(self, x):

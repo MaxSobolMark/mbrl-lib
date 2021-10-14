@@ -59,6 +59,7 @@ double_q_critic:
   action_dim: ${algorithm.sac_agent.action_dim}
   hidden_dim: 1024
   hidden_depth: ${overrides.sac_hidden_depth}
+  device: ${device}
 
 diag_gaussian_actor:
   _target_: mbrl.third_party.pytorch_sac.agent.actor.PNNDiagGaussianActor
@@ -67,3 +68,4 @@ diag_gaussian_actor:
   hidden_depth: ${overrides.sac_hidden_depth}
   hidden_dim: 1024
   log_std_bounds: [-5, 2]
+  device: ${device}
