@@ -4,6 +4,7 @@ from torch import nn
 from mbrl.third_party.pytorch_sac import utils
 from mbrl.third_party.pnn.pnn import PNN
 
+
 class DoubleQCritic(nn.Module):
     """Critic network, employes double Q-learning."""
 
@@ -43,9 +44,9 @@ class DoubleQCritic(nn.Module):
 class PNNDoubleQCritic(nn.Module):
     def __init__(self, obs_dim, action_dim, hidden_dim, hidden_depth):
         super().__init__()
-        self.sizes = [obs_dim + action_dim, hidden_dim, hidden_dim, 1]
-        self.Q1 = PNN(3)
-        self.Q2 = PNN(3)
+        # self.sizes = [obs_dim + action_dim, hidden_dim, hidden_dim, 1]
+        self.Q1 = PNN(obs_dim + action_dim, hidden_dim,  1)
+        self.Q2 = PNN(obs_dim + action_dim, hidden_dim,  1)
         self.outputs = dict()
         self.apply(utils.weight_init)
 
@@ -61,10 +62,8 @@ class PNNDoubleQCritic(nn.Module):
         return q1, q2
 
     def new_task(self):
-        self.Q1.freeze_columns()
-        self.Q2.freeze_columns()
-        self.Q1.new_task(self.sizes)
-        self.Q2.new_task(self.sizes)
+        self.Q1.new_task()
+        self.Q2.new_task()
         print('critic new task added')
 
     def log(self, logger, step):

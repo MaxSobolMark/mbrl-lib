@@ -96,8 +96,8 @@ class DiagGaussianActor(nn.Module):
 class PNNDiagGaussianActor(nn.Module):
     def __init__(self, obs_dim, action_dim, hidden_dim, hidden_depth, log_std_bounds):
         super().__init__()
-        self.sizes = [obs_dim, hidden_dim, hidden_dim, 2 * action_dim]
-        self.policy = PNN(3)
+        # self.sizes = [obs_dim, hidden_dim, hidden_dim, 2 * action_dim]
+        self.policy = PNN(obs_dim, hidden_dim, 2 * action_dim)
         self.log_std_bounds = log_std_bounds
         self.outputs = dict()
         self.apply(utils.weight_init)
@@ -119,8 +119,7 @@ class PNNDiagGaussianActor(nn.Module):
         return dist
 
     def new_task(self):
-        self.policy.freeze_columns()
-        self.policy.new_task(self.sizes)
+        self.policy.new_task()
         print('actor new task added')
 
     def log(self, logger, step):
