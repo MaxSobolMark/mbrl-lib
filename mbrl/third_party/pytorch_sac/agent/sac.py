@@ -64,14 +64,14 @@ class SACAgent(Agent):
         self.critic_lr = critic_lr
         self.critic_betas = critic_betas
         self.add_new_task()
-        '''
+
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(),
                                                 lr=actor_lr,
                                                 betas=actor_betas)
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(),
                                                  lr=critic_lr,
                                                  betas=critic_betas)
-        '''
+
         self.log_alpha_optimizer = torch.optim.Adam([self.log_alpha],
                                                     lr=alpha_lr,
                                                     betas=alpha_betas)

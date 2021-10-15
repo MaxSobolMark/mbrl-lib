@@ -73,7 +73,9 @@ class PNN(nn.Module):
     def new_task(self):
         for i in range(self.n_tasks):
             self.columns[i].freeze()
-        self.columns.append(PNNColumn(self.n_tasks, self.input_size, self.hidden_size, self.output_size, self.device))
+        new_col = PNNColumn(self.n_tasks, self.input_size, self.hidden_size,
+                            self.output_size, self.device).to(self.device)
+        self.columns.append(new_col)
         self.n_tasks += 1
 
     def forward(self, x):
