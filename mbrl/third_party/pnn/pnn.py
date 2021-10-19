@@ -106,7 +106,7 @@ if __name__ == "__main__":
     pnn_hidden_size = 10
     pnn_output_size = 2
 
-    pnn = PNN(pnn_input_size, pnn_hidden_size, pnn_output_size)
+    pnn = PNN(pnn_input_size, pnn_hidden_size, pnn_output_size, 'cuda:0')
     pnn.new_task()
     pnn.new_task()
     pnn.new_task()
