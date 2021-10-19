@@ -107,6 +107,7 @@ if __name__ == "__main__":
     pnn_output_size = 2
 
     pnn = PNN(pnn_input_size, pnn_hidden_size, pnn_output_size, device)
+    print('pnn initialized')
     pnn.new_task()
     pnn.new_task()
     pnn.new_task()
