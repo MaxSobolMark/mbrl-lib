@@ -101,18 +101,18 @@ class PNN(nn.Module):
 
 
 if __name__ == "__main__":
-
+    device = 'cuda:0'
     pnn_input_size = 5
     pnn_hidden_size = 10
     pnn_output_size = 2
 
-    pnn = PNN(pnn_input_size, pnn_hidden_size, pnn_output_size, 'cuda:0')
+    pnn = PNN(pnn_input_size, pnn_hidden_size, pnn_output_size, device)
     pnn.new_task()
     pnn.new_task()
     pnn.new_task()
 
     bsize = 5
-    sample_x = torch.rand(bsize, pnn_input_size)
+    sample_x = torch.rand(bsize, pnn_input_size).to(device)
     print(pnn.forward(sample_x))
     # for p in pnn.parameters():
     #    print(p)
