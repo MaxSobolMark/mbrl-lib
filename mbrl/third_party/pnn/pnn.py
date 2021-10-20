@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.optim as optim
 
 
 class PNNColumn(nn.Module):
@@ -36,19 +37,14 @@ class PNNColumn(nn.Module):
         self.v = self.v.to(self.device)
         self.alpha = self.alpha.to(self.device)
 
-    def forward(self, x, outputs):
+    def forward(self, x, prev_out):
         batch_size = x.shape[0]
-        if self.n_tasks == 0:
-            outputs = torch.zeros(1, self.n_layers-1, batch_size, self.hidden_size).to(self.device)
-        else:
-            new_row = torch.zeros(1, self.n_layers-1, batch_size, self.hidden_size).to(self.device)
-            outputs = torch.cat((outputs.to(self.device), new_row))
-        outputs = outputs.detach()
+        out = torch.zeros(self.n_layers-1, batch_size, self.hidden_size).to(self.device).detach()
         y = F.relu(self.w[0](x))
-        outputs[self.n_tasks][0] = y.detach()
+        out[0] = y.detach()
         for layer in range(self.n_layers-1):
             for k in range(self.n_tasks):
-                v_out = self.v[k][layer](self.alpha[k][layer] * (outputs[k][layer]))
+                v_out = self.v[k][layer](self.alpha[k][layer] * (prev_out[k][layer]))
                 if k == 0:
                     u_out = self.u[k][layer](F.relu(v_out))
                 else:
@@ -59,8 +55,8 @@ class PNNColumn(nn.Module):
                 y = u_out + self.w[layer+1](y)
             if layer != (self.n_layers-2):
                 y = F.relu(y)
-                outputs[self.n_tasks][layer + 1] = y.detach()
-        return y, outputs
+                out[layer + 1] = y.detach()
+        return y, out
 
     def _reset_parameters(self):
         for module in self.modules():
@@ -92,9 +88,10 @@ class PNN(nn.Module):
         self.n_tasks += 1
 
     def forward(self, x):
-        outputs = None
+        outputs = []
         for i in range(self.n_tasks):
-            y, outputs = self.columns[i].forward(x, outputs)
+            y, out = self.columns[i].forward(x, outputs)
+            outputs.append(out)
         return y
 
     def parameters(self):
@@ -102,22 +99,31 @@ class PNN(nn.Module):
 
 
 if __name__ == "__main__":
-    device = 'cuda:0'
-    pnn_input_size = 5
+    device = 'cpu'  # 'cuda:0'
+    pnn_input_size = 1
     pnn_hidden_size = 10
     pnn_output_size = 2
-
+    # preparing the data
+    x = torch.arange(-3, 3, 0.1)
+    ndata = x.shape[0]
+    y = torch.zeros(ndata, 2)
+    y[:, 0] = torch.sin(x)
+    y[:, 1] = torch.cos(x)
+    x = x.view(ndata, 1)
+    torch.autograd.set_detect_anomaly(True)
     pnn = PNN(pnn_input_size, pnn_hidden_size, pnn_output_size, device)
-    print('pnn initialized')
     pnn.new_task()
     pnn.new_task()
-    pnn.new_task()
+    # setting the optimizer
+    optimizer = optim.Adam(pnn.parameters(), 0.001)
+    # training
+    for _ in range(10):
+        optimizer.zero_grad()
+        yhat = pnn.forward(x)
+        loss = F.mse_loss(y, yhat)
+        loss.backward()
+        optimizer.step()
 
-    bsize = 5
-    sample_x = torch.rand(bsize, pnn_input_size).to(device)
-    print(pnn.forward(sample_x))
-    # for p in pnn.parameters():
-    #    print(p)
 
 
 
