@@ -43,6 +43,7 @@ class PNNColumn(nn.Module):
         else:
             new_row = torch.zeros(1, self.n_layers-1, batch_size, self.hidden_size).to(self.device)
             outputs = torch.cat((outputs.to(self.device), new_row))
+        outputs = outputs.detach()
         y = F.relu(self.w[0](x))
         outputs[self.n_tasks][0] = y.detach()
         for layer in range(self.n_layers-1):
@@ -51,7 +52,7 @@ class PNNColumn(nn.Module):
                 if k == 0:
                     u_out = self.u[k][layer](F.relu(v_out))
                 else:
-                    u_out += self.u[k][layer](F.relu(v_out))
+                    u_out = u_out + self.u[k][layer](F.relu(v_out))
             if self.n_tasks == 0:
                 y = self.w[layer + 1](y)
             else:
