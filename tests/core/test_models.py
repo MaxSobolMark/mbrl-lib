@@ -22,17 +22,16 @@ _DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 def test_basic_ensemble_gaussian_forward():
     model_in_size = 2
     model_out_size = 2
-    member_cfg = omegaconf.OmegaConf.create(
-        {
-            "_target_": "mbrl.models.GaussianMLP",
-            "device": _DEVICE,
-            "in_size": model_in_size,
-            "out_size": model_out_size,
-        }
-    )
-    ensemble = mbrl.models.BasicEnsemble(
-        2, torch.device(_DEVICE), member_cfg, propagation_method="expectation"
-    )
+    member_cfg = omegaconf.OmegaConf.create({
+        "_target_": "mbrl.models.GaussianMLP",
+        "device": _DEVICE,
+        "in_size": model_in_size,
+        "out_size": model_out_size,
+    })
+    ensemble = mbrl.models.BasicEnsemble(2,
+                                         torch.device(_DEVICE),
+                                         member_cfg,
+                                         propagation_method="expectation")
     batch_size = 4
     model_in = torch.zeros(batch_size, 2).to(_DEVICE)
 
@@ -65,9 +64,11 @@ _OUTPUT_FACTOR = 10
 
 
 def _create_gaussian_ensemble_mock(ensemble_size, as_float=False):
-    model = mbrl.models.GaussianMLP(
-        1, 1, _DEVICE, num_layers=2, ensemble_size=ensemble_size
-    )
+    model = mbrl.models.GaussianMLP(1,
+                                    1,
+                                    _DEVICE,
+                                    num_layers=2,
+                                    ensemble_size=ensemble_size)
 
     # With this we can use the output value to identify which model produced the output
     def mock_fwd(_x, only_elite=False):
@@ -85,9 +86,8 @@ def _create_gaussian_ensemble_mock(ensemble_size, as_float=False):
     return model
 
 
-def _check_output_counts_and_update_history(
-    model_output, ensemble_size, batch_size, history
-):
+def _check_output_counts_and_update_history(model_output, ensemble_size,
+                                            batch_size, history):
     counts = np.zeros(ensemble_size)
     for i in range(batch_size):
         model_idx = model_output[i].item() % ensemble_size
@@ -116,8 +116,7 @@ def test_gaussian_mlp_ensemble_random_model_propagation():
             model.set_propagation_method("random_model")
             y = model.forward(batch)[0]
             history = _check_output_counts_and_update_history(
-                y, ensemble_size, batch_size, history
-            )
+                y, ensemble_size, batch_size, history)
     # This is really hacky, but it's a cheap test to see if the history of models used
     # varied over the batch
     seen = set([h for h in history])
@@ -141,8 +140,7 @@ def test_gaussian_mlp_ensemble_fixed_model_propagation():
             assert reset_output is batch
             y = model.forward(batch)[0]
             history = _check_output_counts_and_update_history(
-                y, ensemble_size, batch_size, history
-            )
+                y, ensemble_size, batch_size, history)
             for i in range(batch_size):
                 assert history[i][-1] == history[i][0]
 
@@ -164,8 +162,8 @@ def test_gaussian_mlp_ensemble_expectation_propagation():
                 b = val % _OUTPUT_FACTOR
                 assert a == i
                 np.testing.assert_almost_equal(
-                    b, ensemble_size * (ensemble_size - 1) / ensemble_size / 2
-                )
+                    b,
+                    ensemble_size * (ensemble_size - 1) / ensemble_size / 2)
 
 
 _MOCK_OBS_DIM = 1
@@ -173,8 +171,8 @@ _MOCK_ACT_DIM = 1
 
 
 class MockEnv:
-    observation_space = (_MOCK_OBS_DIM,)
-    action_space = (_MOCK_ACT_DIM,)
+    observation_space = (_MOCK_OBS_DIM, )
+    action_space = (_MOCK_ACT_DIM, )
 
 
 class MockProbModel(nn.Module):
@@ -199,8 +197,7 @@ def mock_term_fn(act, next_obs):
 
 def get_mock_env(propagation_method):
     member_cfg = omegaconf.OmegaConf.create(
-        {"_target_": "tests.core.test_models.MockProbModel"}
-    )
+        {"_target_": "tests.core.test_models.MockProbModel"})
     num_members = 3
     ensemble = mbrl.models.BasicEnsemble(
         num_members,
@@ -209,17 +206,17 @@ def get_mock_env(propagation_method):
         propagation_method=propagation_method,
     )
     dynamics_model = mbrl.models.OneDTransitionRewardModel(
-        ensemble, target_is_delta=True, normalize=False, obs_process_fn=None
-    )
+        ensemble, target_is_delta=True, normalize=False, obs_process_fn=None)
     # With value we can uniquely id the output of each member
     member_incs = [i + 10 for i in range(num_members)]
     for i in range(num_members):
         ensemble.members[i].value = member_incs[i]
 
     rng = torch.Generator(device=_DEVICE)
-    model_env = mbrl.models.ModelEnv(
-        MockEnv(), dynamics_model, mock_term_fn, generator=rng
-    )
+    model_env = mbrl.models.ModelEnv(MockEnv(),
+                                     dynamics_model,
+                                     mock_term_fn,
+                                     generator=rng)
     return model_env, member_incs
 
 
@@ -235,7 +232,8 @@ def test_model_env_expectation_propagation():
         next_obs, reward, *_ = model_env.step(action, sample=False)
         assert next_obs.shape == (batch_size, 1)
         cur_sum = np.sum(next_obs)
-        assert (cur_sum - prev_sum) == pytest.approx(batch_size * np.mean(member_incs))
+        assert (cur_sum - prev_sum) == pytest.approx(batch_size *
+                                                     np.mean(member_incs))
         assert reward == pytest.approx(np.mean(member_incs))
         prev_sum = cur_sum
 
@@ -313,7 +311,7 @@ class DummyModel(mbrl.models.Model):
         return torch.cat([new_obs, new_obs], axis=1)
 
     def sample(self, x, deterministic=False, rng=None):
-        return (self.forward(x),)
+        return (self.forward(x), )
 
     def loss(self, _input, target=None):
         return 0.0 * self.param, {"loss": 0}
@@ -327,30 +325,32 @@ class DummyModel(mbrl.models.Model):
 
 def test_model_env_evaluate_action_sequences():
     model = DummyModel()
-    wrapper = mbrl.models.OneDTransitionRewardModel(model, target_is_delta=False)
-    model_env = mbrl.models.ModelEnv(
-        MockEnv(), wrapper, no_termination, generator=torch.Generator()
-    )
+    wrapper = mbrl.models.OneDTransitionRewardModel(model,
+                                                    target_is_delta=False)
+    model_env = mbrl.models.ModelEnv(MockEnv(),
+                                     wrapper,
+                                     no_termination,
+                                     generator=torch.Generator())
     for num_particles in range(1, 10):
         for horizon in range(1, 10):
-            action_sequences = torch.stack(
-                [
-                    torch.ones(horizon, _MOCK_ACT_DIM),
-                    2 * torch.ones(horizon, _MOCK_ACT_DIM),
-                ]
-            ).to(_DEVICE)
-            expected_returns = horizon * (horizon + 1) * action_sequences[..., 0, 0] / 2
+            action_sequences = torch.stack([
+                torch.ones(horizon, _MOCK_ACT_DIM),
+                2 * torch.ones(horizon, _MOCK_ACT_DIM),
+            ]).to(_DEVICE)
+            expected_returns = horizon * (horizon +
+                                          1) * action_sequences[..., 0, 0] / 2
             returns = model_env.evaluate_action_sequences(
                 action_sequences,
                 np.zeros((1, _MOCK_OBS_DIM)),
                 num_particles=num_particles,
-            )
+            )[0]
             assert torch.allclose(expected_returns, returns)
 
 
 def test_model_trainer_batch_callback():
     model = DummyModel()
-    wrapper = mbrl.models.OneDTransitionRewardModel(model, target_is_delta=False)
+    wrapper = mbrl.models.OneDTransitionRewardModel(model,
+                                                    target_is_delta=False)
     trainer = mbrl.models.ModelTrainer(wrapper)
     num_batches = 10
     dummy_data = torch.zeros(num_batches, 1)
@@ -378,7 +378,9 @@ def test_model_trainer_batch_callback():
             val_counter[epoch] += 1
 
     num_epochs = 20
-    trainer.train(mock_dataset, num_epochs=num_epochs, batch_callback=batch_callback)
+    trainer.train(mock_dataset,
+                  num_epochs=num_epochs,
+                  batch_callback=batch_callback)
 
     for counter in [train_counter, val_counter]:
         assert set(counter.keys()) == set(range(num_epochs))

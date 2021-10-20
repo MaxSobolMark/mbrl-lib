@@ -194,7 +194,7 @@ class ModelEnv:
             total_rewards += rewards
 
         total_rewards = total_rewards.reshape(-1, num_particles)
-        return total_rewards.mean(dim=1)
+        return total_rewards.mean(dim=1), total_rewards.std(dim=1)
 
     def evaluate_agent(
         self,
@@ -219,4 +219,4 @@ class ModelEnv:
             terminated |= dones
             total_rewards += rewards
         total_rewards = total_rewards.reshape(-1, num_particles)
-        return total_rewards.mean(dim=1)
+        return total_rewards.mean(dim=1), total_rewards.std(dim=1)

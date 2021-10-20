@@ -76,19 +76,28 @@ class CombinedAgent(Agent):
                     np.newaxis]
                 print('[combined_agent:49] planner_action_sequence.shape: ',
                       planner_action_sequence.shape)
-                planner_returns_expectation = (
+                planner_returns_expectation, planner_returns_std = (
                     self._model_env.evaluate_action_sequences(
                         torch.Tensor(planner_action_sequence).to(
                             self._cfg.device),
                         initial_state=obs,
                         num_particles=self._cfg.algorithm.num_particles))
-                explicit_policy_returns_expectation = self._model_env.evaluate_agent(
-                    self.sac_agent, obs, self._cfg.overrides.planning_horizon,
-                    self._cfg.algorithm.num_particles)
+                (explicit_policy_returns_expectation,
+                 explicit_policy_returns_std) = self._model_env.evaluate_agent(
+                     self.sac_agent, obs, self._cfg.overrides.planning_horizon,
+                     self._cfg.algorithm.num_particles)
 
-                self._policy_to_use_current_epoch = (
-                    'planner' if planner_returns_expectation >
-                    explicit_policy_returns_expectation else 'explicit_policy')
+                if self._cfg.get('combined_policy_prefer_explicit_policy',
+                                 False):
+                    self._policy_to_use_current_epoch = (
+                        'planner' if planner_returns_expectation >
+                        explicit_policy_returns_expectation +
+                        explicit_policy_returns_std else 'explicit_policy')
+                else:
+                    self._policy_to_use_current_epoch = (
+                        'planner' if planner_returns_expectation >
+                        explicit_policy_returns_expectation else
+                        'explicit_policy')
                 self._diagnostics = {
                     'planner_returns_expectation':
                     planner_returns_expectation,
@@ -102,7 +111,7 @@ class CombinedAgent(Agent):
             return self.planning_agent.act(obs, **kwargs)
         else:
             if return_plan:
-                self.sac_agent.plan(obs, **kwargs)
+                return self.sac_agent.plan(obs, **kwargs)
             return self.sac_agent.act(obs, **kwargs)
 
         # with pytorch_sac_utils.eval_mode(), torch.no_grad():

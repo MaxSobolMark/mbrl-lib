@@ -530,7 +530,7 @@ def create_trajectory_optim_agent_for_model(
             action_sequences,
             initial_state=initial_state,
             num_particles=num_particles,
-            mopo_penalty_coeff=planning_mopo_penalty_coeff)
+            mopo_penalty_coeff=planning_mopo_penalty_coeff)[0]
 
     agent.set_trajectory_eval_fn(trajectory_eval_fn)
     return agent
