@@ -15,27 +15,26 @@ class PNNColumn(nn.Module):
         self.hidden_size = hidden_size
         self.n_layers = 3
         self.w = nn.ModuleList()
-        self.u = nn.ModuleList()
-        self.v = nn.ModuleList()
-        self.alpha = nn.ModuleList()
         self.w.append(nn.Linear(input_size, hidden_size))
         self.w.append(nn.Linear(hidden_size, hidden_size))
         self.w.append(nn.Linear(hidden_size, output_size))
-        for i in range(self.n_tasks):
-            self.v.append(nn.ModuleList())
-            self.v[i].append(nn.Linear(hidden_size, hidden_size))
-            self.v[i].append(nn.Linear(hidden_size, hidden_size))
-            self.u.append(nn.ModuleList())
-            self.u[i].append(nn.Linear(hidden_size, hidden_size))
-            self.u[i].append(nn.Linear(hidden_size, output_size))
-            self.alpha.append(nn.ParameterList())
-            self.alpha[i].append(nn.Parameter(torch.tensor(1e-2)))
-            self.alpha[i].append(nn.Parameter(torch.tensor(1e-2)))
-        self._reset_parameters()
         self.w = self.w.to(self.device)
-        self.u = self.u.to(self.device)
-        self.v = self.v.to(self.device)
-        self.alpha = self.alpha.to(self.device)
+        if self.n_tasks:
+            self.u = nn.ModuleList()
+            self.u.append(nn.Linear(hidden_size, hidden_size))
+            self.u.append(nn.Linear(hidden_size, output_size))
+            self.v = nn.ModuleList()
+            self.v.append(nn.Linear(hidden_size*self.n_tasks, hidden_size))
+            self.v.append(nn.Linear(hidden_size*self.n_tasks, hidden_size))
+            self.alpha = nn.ModuleList()
+            for i in range(self.n_tasks):
+                self.alpha.append(nn.ParameterList())
+                self.alpha[i].append(nn.Parameter(torch.tensor(1e-3)))
+                self.alpha[i].append(nn.Parameter(torch.tensor(1e-3)))
+            self.u = self.u.to(self.device)
+            self.v = self.v.to(self.device)
+            self.alpha = self.alpha.to(self.device)
+        self._reset_parameters()
 
     def forward(self, x, prev_out):
         batch_size = x.shape[0]
@@ -43,16 +42,13 @@ class PNNColumn(nn.Module):
         y = F.relu(self.w[0](x))
         out[0] = y.detach()
         for layer in range(self.n_layers-1):
-            for k in range(self.n_tasks):
-                v_out = self.v[k][layer](self.alpha[k][layer] * (prev_out[k][layer]))
-                if k == 0:
-                    u_out = self.u[k][layer](F.relu(v_out))
-                else:
-                    u_out = u_out + self.u[k][layer](F.relu(v_out))
-            if self.n_tasks == 0:
-                y = self.w[layer + 1](y)
-            else:
-                y = u_out + self.w[layer+1](y)
+            y = self.w[layer + 1](y)
+            if self.n_tasks:
+                v_in = torch.zeros(batch_size, self.hidden_size*self.n_tasks).to(self.device)
+                for k in range(self.n_tasks):
+                    v_in[:, k*self.hidden_size:(k+1)*self.hidden_size] = self.alpha[k][layer] * prev_out[k][layer]
+                u_out = self.u[layer](F.relu(self.v[layer](v_in)))
+                y = y + u_out
             if layer != (self.n_layers-2):
                 y = F.relu(y)
                 out[layer + 1] = y.detach()
@@ -104,12 +100,12 @@ if __name__ == "__main__":
     pnn_hidden_size = 10
     pnn_output_size = 2
     # preparing the data
-    x = torch.arange(-3, 3, 0.1)
-    ndata = x.shape[0]
-    y = torch.zeros(ndata, 2)
-    y[:, 0] = torch.sin(x)
-    y[:, 1] = torch.cos(x)
-    x = x.view(ndata, 1)
+    data_x = torch.arange(-1, 1, 0.1)
+    ndata = data_x.shape[0]
+    data_y = torch.zeros(ndata, 2)
+    data_y[:, 0] = torch.sin(data_x)
+    data_y[:, 1] = torch.cos(data_x)
+    data_x = data_x.view(ndata, 1)
     torch.autograd.set_detect_anomaly(True)
     pnn = PNN(pnn_input_size, pnn_hidden_size, pnn_output_size, device)
     pnn.new_task()
@@ -119,8 +115,8 @@ if __name__ == "__main__":
     # training
     for _ in range(10):
         optimizer.zero_grad()
-        yhat = pnn.forward(x)
-        loss = F.mse_loss(y, yhat)
+        yhat = pnn.forward(data_x)
+        loss = F.mse_loss(data_y, yhat)
         loss.backward()
         optimizer.step()
 
