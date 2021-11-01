@@ -32,6 +32,10 @@ from .mbpo import (MBPO_LOG_FORMAT, rollout_model_and_populate_sac_buffer,
                    evaluate, maybe_replace_sac_buffer)
 
 EVAL_LOG_FORMAT = mbrl.constants.EVAL_LOG_FORMAT
+POLICY_DIAGNOSTICS_FORMAT = [
+    ('explicit_policy_returns_expectation', 'EP', 'float'),
+    ('planning_policy_returns_expectation', 'PP', 'float'),
+]
 
 
 class PolicyType(Enum):
@@ -79,6 +83,9 @@ def train(
         logger.register_group(mbrl.constants.RESULTS_LOG_NAME,
                               EVAL_LOG_FORMAT,
                               color="green")
+        logger.register_group('policy_diagnostics',
+                              POLICY_DIAGNOSTICS_FORMAT,
+                              color='red')
     gt.reset_root()
     gt.rename_root('lifelong_learning_pets')
     gt.set_def_unique(False)
@@ -166,6 +173,7 @@ def train(
         num_particles=cfg.algorithm.num_particles,
         planning_mopo_penalty_coeff=cfg.algorithm.planning_mopo_penalty_coeff)
     steps_trial = 0
+    env_steps_this_task = 0
     if policy_to_use == PolicyType.CEM_PLANNING:
         agent = planning_agent
     elif policy_to_use == PolicyType.EXPLICIT_POLICY:
@@ -181,6 +189,7 @@ def train(
                 current_task_index=task_i,
                 timestep_in_epoch=steps_trial,
                 current_task_replay_buffer=task_replay_buffers[task_i],
+                env_steps_this_task=env_steps_this_task,
                 **kwargs)
 
         agent.act = act_wrapper
@@ -245,7 +254,7 @@ def train(
                     gt.stamp('train_model')
 
                 # --- Doing env step using the agent and adding to model dataset ---
-                next_obs, reward, done, _ = mbrl.util.common.step_env_and_add_to_buffer(
+                next_obs, reward, done, step_info = mbrl.util.common.step_env_and_add_to_buffer(
                     lifelong_learning_envs[task_i], obs, agent, {},
                     task_replay_buffers[task_i])
                 gt.stamp('step_env')
@@ -270,6 +279,9 @@ def train(
                     mbrl.util.replay_buffer.concatenate_batches(
                         real_batches_for_rollout))
                 if rollout_length > 0:
+                    policy_mopo_penalty_coeff = (
+                        cfg.overrides.policy_mopo_penalty_coeff
+                        if agent.should_mopo_for_policy_be_used() else 0.)
                     rollout_model_and_populate_sac_buffer(
                         model_env,
                         None,
@@ -279,8 +291,7 @@ def train(
                         rollout_length,
                         mbpo_rollout_batch_size,
                         batch=real_batches_for_rollout,
-                        mopo_penalty_coeff=cfg.overrides.
-                        policy_mopo_penalty_coeff)
+                        mopo_penalty_coeff=policy_mopo_penalty_coeff)
                 if debug_mode:
                     print(f"Epoch: {epoch}. "
                           f"SAC buffer size: {len(sac_buffer)}. "
@@ -315,17 +326,19 @@ def train(
                     active_policy = 1
                 else:
                     active_policy = 0
-                logger.log_data(
-                    mbrl.constants.RESULTS_LOG_NAME,
-                    {
-                        "epoch": epoch,
-                        "env_step": env_steps,
-                        "episode_reward": total_reward,
-                        "rollout_length": rollout_length,
-                        "task_index": task_i,
-                        'active_policy': active_policy,
-                    },
-                )
+                results_dict = {
+                    "epoch": epoch,
+                    "env_step": env_steps,
+                    "episode_reward": total_reward,
+                    "rollout_length": rollout_length,
+                    "task_index": task_i,
+                    'active_policy': active_policy,
+                }
+                results_dict.update(step_info)
+                logger.log_data(mbrl.constants.RESULTS_LOG_NAME, results_dict)
+                if hasattr(agent, 'get_episode_diagnostics'):
+                    logger.log_data('policy_diagnostics',
+                                    agent.get_episode_diagnostics())
             for i, test_env in enumerate(evaluation_environments):
                 evaluate(test_env, sac_agent, cfg.algorithm.num_eval_episodes,
                          video_recorder)

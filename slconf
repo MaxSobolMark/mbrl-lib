@@ -1,5 +1,8 @@
+--partition=iris
 --qos=normal
+--exclude=iris3,iris5,iris6
 --time=48:00:00
+--nodes=1
 --cpus-per-task=4
 --mem=20G
 --gres=gpu:1

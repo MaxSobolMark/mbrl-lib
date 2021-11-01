@@ -19,7 +19,6 @@ import mbrl.types
 
 class Agent:
     """Abstract class for all agents."""
-
     @abc.abstractmethod
     def act(self, obs: np.ndarray, **_kwargs) -> np.ndarray:
         """Issues an action given an observation.
@@ -50,6 +49,12 @@ class Agent:
         """Resets any internal state of the agent."""
         pass
 
+    def should_mopo_for_policy_be_used(self) -> bool:
+        return True
+
+    def should_mopo_for_planner_be_used(self) -> bool:
+        return True
+
 
 class RandomAgent(Agent):
     """An agent that samples action from the environments action space.
@@ -57,7 +62,6 @@ class RandomAgent(Agent):
     Args:
         env (gym.Env): the environment on which the agent will act.
     """
-
     def __init__(self, env: gym.Env):
         self.env = env
 
@@ -70,9 +74,8 @@ class RandomAgent(Agent):
         return self.env.action_space.sample()
 
 
-def complete_agent_cfg(
-    env: Union[gym.Env, mbrl.models.ModelEnv], agent_cfg: omegaconf.DictConfig
-):
+def complete_agent_cfg(env: Union[gym.Env, mbrl.models.ModelEnv],
+                       agent_cfg: omegaconf.DictConfig):
     """Completes an agent's configuration given information from the environment.
 
     The goal of this function is to completed information about state and action shapes and ranges,
@@ -132,16 +135,15 @@ def load_agent(agent_path: Union[str, pathlib.Path], env: gym.Env) -> Agent:
     agent_path = pathlib.Path(agent_path)
     cfg = omegaconf.OmegaConf.load(agent_path / ".hydra" / "config.yaml")
 
-    if (
-        cfg.algorithm.agent._target_
-        == "mbrl.third_party.pytorch_sac.agent.sac.SACAgent"
-    ):
+    if (cfg.algorithm.agent._target_ ==
+            "mbrl.third_party.pytorch_sac.agent.sac.SACAgent"):
         import mbrl.third_party.pytorch_sac as pytorch_sac
 
         from .sac_wrapper import SACAgent
 
         complete_agent_cfg(env, cfg.algorithm.agent)
-        agent: pytorch_sac.SACAgent = hydra.utils.instantiate(cfg.algorithm.agent)
+        agent: pytorch_sac.SACAgent = hydra.utils.instantiate(
+            cfg.algorithm.agent)
         agent.critic.load_state_dict(torch.load(agent_path / "critic.pth"))
         agent.actor.load_state_dict(torch.load(agent_path / "actor.pth"))
         return SACAgent(agent)

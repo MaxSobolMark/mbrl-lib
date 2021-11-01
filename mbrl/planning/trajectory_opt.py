@@ -500,11 +500,11 @@ class TrajectoryOptimizerAgent(Agent):
 
 
 def create_trajectory_optim_agent_for_model(
-    model_env: mbrl.models.ModelEnv,
-    agent_cfg: omegaconf.DictConfig,
-    num_particles: int = 1,
-    planning_mopo_penalty_coeff: float = 0,
-) -> TrajectoryOptimizerAgent:
+        model_env: mbrl.models.ModelEnv,
+        agent_cfg: omegaconf.DictConfig,
+        num_particles: int = 1,
+        planning_mopo_penalty_coeff: float = 0,
+        should_use_mopo_fn: Callable = None) -> TrajectoryOptimizerAgent:
     """Utility function for creating a trajectory optimizer agent for a model environment.
 
     This is a convenience function for creating a :class:`TrajectoryOptimizerAgent`,
@@ -525,11 +525,15 @@ def create_trajectory_optim_agent_for_model(
     agent = hydra.utils.instantiate(agent_cfg)
 
     def trajectory_eval_fn(initial_state, action_sequences):
+        mopo_penalty_coeff = planning_mopo_penalty_coeff
+        if should_use_mopo_fn is not None:
+            if not should_use_mopo_fn():
+                mopo_penalty_coeff = 0.
         return model_env.evaluate_action_sequences(
             action_sequences,
             initial_state=initial_state,
             num_particles=num_particles,
-            mopo_penalty_coeff=planning_mopo_penalty_coeff)
+            mopo_penalty_coeff=mopo_penalty_coeff)[0]
 
     agent.set_trajectory_eval_fn(trajectory_eval_fn)
     return agent
