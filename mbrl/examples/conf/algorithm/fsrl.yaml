@@ -57,7 +57,7 @@ double_q_critic:
   _target_: mbrl.third_party.pytorch_sac.agent.critic.PNNDoubleQCritic
   obs_dim: ${algorithm.sac_agent.obs_dim}
   action_dim: ${algorithm.sac_agent.action_dim}
-  hidden_dim: 1024
+  hidden_dim: 512 #1024
   hidden_depth: ${overrides.sac_hidden_depth}
   device: ${device}
 
@@ -66,6 +66,6 @@ diag_gaussian_actor:
   obs_dim: ${algorithm.sac_agent.obs_dim}
   action_dim: ${algorithm.sac_agent.action_dim}
   hidden_depth: ${overrides.sac_hidden_depth}
-  hidden_dim: 1024
+  hidden_dim: 512 #1024
   log_std_bounds: [-5, 2]
   device: ${device}

@@ -45,8 +45,8 @@ class PNNDoubleQCritic(nn.Module):
     def __init__(self, obs_dim, action_dim, hidden_dim, hidden_depth, device):
         super().__init__()
         # self.sizes = [obs_dim + action_dim, hidden_dim, hidden_dim, 1]
-        self.Q1 = PNN(obs_dim + action_dim, hidden_dim,  1, device)
-        self.Q2 = PNN(obs_dim + action_dim, hidden_dim,  1, device)
+        self.Q1 = PNN(obs_dim + action_dim, hidden_dim, 128, 1, device)
+        self.Q2 = PNN(obs_dim + action_dim, hidden_dim, 128, 1, device)
         self.outputs = dict()
         self.apply(utils.weight_init)
 
