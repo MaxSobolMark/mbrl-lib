@@ -1,7 +1,7 @@
 # @package _group_
 name: "fsrl"
 
-policy_to_use: "combined"
+policy_to_use: ${overrides.policy_to_use} # "combined"
 normalize: false  # true
 normalize_double_precision: false  # true
 target_is_delta: true
@@ -50,7 +50,7 @@ sac_agent:
   critic_betas: [0.9, 0.999]
   critic_tau: 0.005
   critic_target_update_frequency: ${overrides.sac_critic_target_update_frequency}
-  batch_size: 256
+  batch_size: ${overrides.sac_batch_size} # 256
   learnable_temperature: true
   target_entropy: ${overrides.sac_target_entropy}
 
@@ -58,7 +58,7 @@ double_q_critic:
   _target_: mbrl.third_party.pytorch_sac.agent.critic.DoubleQCritic
   obs_dim: ${algorithm.sac_agent.obs_dim}
   action_dim: ${algorithm.sac_agent.action_dim}
-  hidden_dim: 1024
+  hidden_dim: ${overrides.sac_hidden_dim} # 1024
   hidden_depth: ${overrides.sac_hidden_depth}
 
 diag_gaussian_actor:
@@ -66,5 +66,5 @@ diag_gaussian_actor:
   obs_dim: ${algorithm.sac_agent.obs_dim}
   action_dim: ${algorithm.sac_agent.action_dim}
   hidden_depth: ${overrides.sac_hidden_depth}
-  hidden_dim: 1024
+  hidden_dim: ${overrides.sac_hidden_dim}  # 1024
   log_std_bounds: [-5, 2]

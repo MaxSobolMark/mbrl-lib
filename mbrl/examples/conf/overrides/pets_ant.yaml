@@ -1,5 +1,5 @@
 # @package _group_
-policy_to_use: "EXPLICIT_POLICY"
+policy_to_use: "CEM_planning"
 env: "ant_truncated_obs_goal_0"
 num_distinct_envs: 1
 envs:

@@ -1,15 +1,17 @@
 # @package _group_
-policy_to_use: "EXPLICIT_POLICY"
-env: "ant_truncated_obs_goal_0"
+policy_to_use: CEM_PLANNING
+env: "swimmer_goal_0"
 num_distinct_envs: 1
 envs:
   -
-    env_name: "ant_truncated_obs"
+    env_name: "gym___Swimmer-v2"
     wrappers: []
-    task_name: "ant_truncated_obs_goal_0"
-    reward_fn: "ant_truncated_obs"
+    task_name: "swimmer_goal_0"
+    reward_fn: "Swimmer-v2"
+    reward_fn_kwargs:
+      goal: 0
     env_kwargs:
-      goal: 0  # 1.570796  # 90 / 180 * np.pi
+      goal: 0
 
 term_fn: "no_termination"
 # obs_process_fn: none
@@ -23,10 +25,10 @@ patience: 10
 model_lr: 0.0003
 model_wd: 0.00002
 model_batch_size: 256
-validation_ratio: 0.2
+validation_ratio: 0.
 freq_train_model: 250
 effective_model_rollouts_per_step: 400
-rollout_schedule: [20, 100, 1, 25]
+rollout_schedule: [20, 100, 1, 1]
 num_sac_updates_per_step: 20
 sac_updates_every_steps: 1
 num_epochs_to_retain_sac_buffer: 1

@@ -81,9 +81,22 @@ def create_one_dim_tr_model(
     if model_cfg._target_ == "mbrl.models.BasicEnsemble":
         model_cfg = model_cfg.member_cfg
     if model_cfg.get("in_size", None) is None:
-        model_cfg.in_size = obs_shape[0] + (act_shape[0] if act_shape else 1)
+        if not cfg.overrides.observe_task_id:
+            model_cfg.in_size = obs_shape[0] + (
+                act_shape[0] if act_shape else
+                1) - cfg.overrides.num_distinct_envs  # len(cfg.overrides.envs)
+        else:
+            model_cfg.in_size = obs_shape[0] + (act_shape[0]
+                                                if act_shape else 1)
     if model_cfg.get("out_size", None) is None:
-        model_cfg.out_size = obs_shape[0] + int(cfg.algorithm.learned_rewards)
+        if not cfg.overrides.observe_task_id:
+            model_cfg.out_size = obs_shape[0] + int(
+                cfg.algorithm.learned_rewards
+            ) - cfg.overrides.num_distinct_envs  # len(cfg.overrides.envs)
+            print('[common:89] out_size: ', model_cfg.out_size)
+        else:
+            model_cfg.out_size = obs_shape[0] + int(
+                cfg.algorithm.learned_rewards)
 
     # Now instantiate the model
     model = hydra.utils.instantiate(cfg.dynamics_model.model)
@@ -256,7 +269,7 @@ def get_basic_buffer_iterators(
         val_iter = TransitionIterator(val_data,
                                       batch_size,
                                       shuffle_each_epoch=False,
-                                      rng=replay_buffer.rng)
+                                      rng=rng)
 
     return train_iter, val_iter
 
@@ -544,6 +557,7 @@ def step_env_and_add_to_buffer(
     action = agent.act(obs, **agent_kwargs)
     gt.stamp('agent.act')
     next_obs, reward, done, info = env.step(action)
+    info['action_taken'] = action
     gt.stamp('env.step')
     replay_buffer.add(obs, action, next_obs, reward, done)
     if callback:

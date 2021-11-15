@@ -279,9 +279,13 @@ def train(
                     mbrl.util.replay_buffer.concatenate_batches(
                         real_batches_for_rollout))
                 if rollout_length > 0:
-                    policy_mopo_penalty_coeff = (
-                        cfg.overrides.policy_mopo_penalty_coeff
-                        if agent.should_mopo_for_policy_be_used() else 0.)
+                    if hasattr(agent, 'should_mopo_for_policy_be_used'):
+                        policy_mopo_penalty_coeff = (
+                            cfg.overrides.policy_mopo_penalty_coeff
+                            if agent.should_mopo_for_policy_be_used() else 0.)
+                    else:
+                        policy_mopo_penalty_coeff = (
+                            cfg.overrides.policy_mopo_penalty_coeff)
                     rollout_model_and_populate_sac_buffer(
                         model_env,
                         None,
@@ -335,6 +339,7 @@ def train(
                     'active_policy': active_policy,
                 }
                 results_dict.update(step_info)
+                results_dict.pop('TimeLimit.truncated', None)
                 logger.log_data(mbrl.constants.RESULTS_LOG_NAME, results_dict)
                 if hasattr(agent, 'get_episode_diagnostics'):
                     logger.log_data('policy_diagnostics',

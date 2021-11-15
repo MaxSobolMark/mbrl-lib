@@ -1,7 +1,8 @@
 """A set of reward utilities written by the authors of dm_control
 Copied from Meta-World repo, branch new-reward-functions.
 Modified to use Tensorflow instead of Numpy"""
-import tensorflow as tf
+import numpy as np
+import torch
 
 # The value returned by tolerance() at `margin` distance from `bounds` interval.
 _DEFAULT_VALUE_AT_MARGIN = 0.1
@@ -34,15 +35,15 @@ def _sigmoids(x, value_at_1, sigmoid):
                              'got {}.'.format(value_at_1))
 
     if sigmoid == 'gaussian':
-        scale = tf.sqrt(-2 * tf.math.log(value_at_1))
-        return tf.math.exp(-0.5 * (x * scale)**2)
+        scale = np.sqrt(-2 * np.log(value_at_1))
+        return torch.exp(-0.5 * (x * scale)**2)
 
     elif sigmoid == 'hyperbolic':
         scale = np.arccosh(1 / value_at_1)
         return 1 / np.cosh(x * scale)
 
     elif sigmoid == 'long_tail':
-        scale = tf.sqrt(1 / value_at_1 - 1)
+        scale = torch.sqrt(1 / value_at_1 - 1)
         return 1 / ((x * scale)**2 + 1)
 
     elif sigmoid == 'reciprocal':
@@ -77,7 +78,8 @@ def tolerance(x,
               bounds=(0.0, 0.0),
               margin=0.0,
               sigmoid='gaussian',
-              value_at_margin=_DEFAULT_VALUE_AT_MARGIN):
+              value_at_margin=_DEFAULT_VALUE_AT_MARGIN,
+              device: str = 'cpu'):
     """Returns 1 when `x` falls inside the bounds, between 0 and 1 otherwise.
 
     Args:
@@ -111,19 +113,24 @@ def tolerance(x,
             f'Lower bound must be <= upper bound. Lower: {lower}; upper: {upper}'
         )
 
+    if margin < 0.:
+        print('margin: ', margin)
+        print('numpy: ', margin.numpy())
+        raise ValueError(
+            '`margin` must be non-negative. Current value: {}'.format(margin))
 
-#    if margin < 0.:
-#        print('margin: ', margin)
-#        print('numpy: ', margin.numpy())
-#        raise ValueError('`margin` must be non-negative. Current value: {}'.format(margin))
-
-    in_bounds = tf.math.logical_and(lower <= x, x <= upper)
-    d = tf.divide(tf.where(x < lower, lower - x, x - upper),
-                  tf.cast(margin, tf.float32))
-    value = tf.where(condition=margin == 0,
-                     x=tf.where(in_bounds, 1.0, 0.0),
-                     y=tf.where(in_bounds, 1.0,
-                                _sigmoids(d, value_at_margin, sigmoid)))
+    in_bounds = torch.logical_and(lower <= x, x <= upper)
+    d = torch.divide(
+        torch.where(x < lower, lower - x, x - upper),
+        #tf.cast(margin, tf.float32))
+        margin)
+    value = torch.where(
+        (margin == 0).to(device),
+        torch.where(in_bounds, 1.0, 0.0).to(device),
+        torch.where(in_bounds.to(device),
+                    torch.Tensor([1.0]).to(device),
+                    _sigmoids(d, value_at_margin,
+                              sigmoid).to(device)).to(device))
 
     return float(value) if x.shape == () else value
 
@@ -199,7 +206,7 @@ def rect_prism_tolerance(curr, zero, one):
         return 1.
 
 
-def hamacher_product(a: tf.Tensor, b: tf.Tensor) -> tf.Tensor:
+def hamacher_product(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
     """The element-wise hamacher (t-norm) product of a and b.
 
     computes (a * b) / ((a + b) - (a * b))
@@ -215,14 +222,16 @@ def hamacher_product(a: tf.Tensor, b: tf.Tensor) -> tf.Tensor:
     """
     #    if not ((0. <= a <= 1.) and (0. <= b <= 1.)):
     #        raise ValueError("a and b must range between 0 and 1")
-    a_times_b = tf.multiply(a, b)  # Element-wise
+    a_times_b = torch.multiply(a, b)  # Element-wise
     denominator = a + b - a_times_b
-    h_prod = tf.where(denominator > 0, tf.divide(a_times_b, denominator), 0.)
+    h_prod = torch.where(denominator > 0, torch.divide(a_times_b, denominator),
+                         0.)
     #    assert 0. <= h_prod <= 1.
     return h_prod
 
 
-def _reward_pos(obs: tf.Tensor, goal_position: tf.Tensor) -> tf.Tensor:
+def _reward_pos(obs: torch.Tensor,
+                goal_position: torch.Tensor) -> torch.Tensor:
     """Modified version of _reward_pos that doesn't require theta.
 
     Args:
@@ -233,30 +242,30 @@ def _reward_pos(obs: tf.Tensor, goal_position: tf.Tensor) -> tf.Tensor:
         [type]: [description]
     """
     hand = obs[:, :3]
-    door = obs[:, 4:7] + tf.constant([-0.05, 0, 0])
+    door = obs[:, 4:7] + torch.constant([-0.05, 0, 0])
 
     threshold = 0.12
     # floor is a 3D funnel centered on the door handle
-    radius = tf.norm(hand[:, :2] - door[:, :2], axis=-1)
-    floor = tf.where(condition=radius <= threshold,
-                     x=0.0,
-                     y=0.04 * tf.math.log(radius - threshold) + 0.4)
+    radius = torch.norm(hand[:, :2] - door[:, :2], axis=-1)
+    floor = torch.where(condition=radius <= threshold,
+                        x=0.0,
+                        y=0.04 * torch.log(radius - threshold) + 0.4)
     # if radius <= threshold:
     #     floor = 0.0
     # else:
     #     floor = 0.04 * tf.math.log(radius - threshold) + 0.4
     # prevent the hand from running into the handle prematurely by keeping
     # it above the "floor"
-    above_floor = tf.where(condition=hand[:, 2] >= floor,
-                           x=1.0,
-                           y=tolerance(
-                               floor - hand[:, 2],
-                               bounds=(0.0, 0.01),
-                               margin=tf.math.maximum(
-                                   floor / 2.0,
-                                   tf.broadcast_to(0.0, floor.shape)),
-                               sigmoid='long_tail',
-                           ))
+    above_floor = torch.where(condition=hand[:, 2] >= floor,
+                              x=1.0,
+                              y=tolerance(
+                                  floor - hand[:, 2],
+                                  bounds=(0.0, 0.01),
+                                  margin=torch.maximum(
+                                      floor / 2.0,
+                                      torch.broadcast_to(0.0, floor.shape)),
+                                  sigmoid='long_tail',
+                              ))
     # above_floor = 1.0 if hand[2] >= floor else tolerance(
     #     floor - hand[2],
     #     bounds=(0.0, 0.01),
@@ -265,7 +274,7 @@ def _reward_pos(obs: tf.Tensor, goal_position: tf.Tensor) -> tf.Tensor:
     # )
     # move the hand to a position between the handle and the main door body
     in_place = tolerance(
-        tf.norm(hand - door - tf.constant([0.05, 0.03, -0.01]), axis=-1),
+        torch.norm(hand - door - torch.constant([0.05, 0.03, -0.01]), axis=-1),
         bounds=(0, threshold / 2.0),
         margin=0.5,
         sigmoid='long_tail',
@@ -279,7 +288,7 @@ def _reward_pos(obs: tf.Tensor, goal_position: tf.Tensor) -> tf.Tensor:
     # opened = a * float(theta < -np.pi/90.) + b * reward_utils.tolerance(
     opened = tolerance(
         # np.pi/2. + np.pi/6 - door_angle,
-        tf.norm(door - goal_position, axis=-1),
+        torch.norm(door - goal_position, axis=-1),
         # bounds=(0, 0.5),
         bounds=(0, 0.08),
         # margin=np.pi/3.,
@@ -290,7 +299,7 @@ def _reward_pos(obs: tf.Tensor, goal_position: tf.Tensor) -> tf.Tensor:
     return ready_to_open, opened
 
 
-def _reward_grab_effort(actions: tf.Tensor) -> tf.Tensor:
+def _reward_grab_effort(actions: torch.Tensor) -> torch.Tensor:
     """calculates grab-effort part of the reward.
 
     Args:
@@ -299,4 +308,4 @@ def _reward_grab_effort(actions: tf.Tensor) -> tf.Tensor:
     Returns:
         tf.Tensor: [n]
     """
-    return (tf.clip_by_value(actions[:, 3], -1, 1) + 1.0) / 2.0
+    return (torch.clip_by_value(actions[:, 3], -1, 1) + 1.0) / 2.0

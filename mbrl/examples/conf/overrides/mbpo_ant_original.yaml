@@ -1,15 +1,13 @@
 # @package _group_
 policy_to_use: "EXPLICIT_POLICY"
-env: "ant_truncated_obs_goal_0"
+env: "ant_truncated_obs_original"
 num_distinct_envs: 1
 envs:
   -
-    env_name: "ant_truncated_obs"
+    env_name: "ant_truncated_obs_original"
     wrappers: []
-    task_name: "ant_truncated_obs_goal_0"
-    reward_fn: "ant_truncated_obs"
-    env_kwargs:
-      goal: 0  # 1.570796  # 90 / 180 * np.pi
+    task_name: "ant_truncated_obs_original"
+    reward_fn: "ant_truncated_obs_original"
 
 term_fn: "no_termination"
 # obs_process_fn: none

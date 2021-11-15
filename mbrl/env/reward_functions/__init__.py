@@ -9,6 +9,12 @@ from .half_cheetah_reward_function import HalfCheetahRewardFunction
 from .half_cheetah_backwards_reward_function import (
     HalfCheetahBackwardsRewardFunction)
 from .half_cheetah_jump_reward_function import HalfCheetahJumpRewardFunction
+# from .pusher_reward_function import PusherRewardFunction
+from .ant_reward_function import AntRewardFunction
+from .ant_original_reward_function import AntOriginalRewardFunction
+from .swimmer_reward_function import SwimmerRewardFunction
+from .swimmer_original_reward_function import SwimmerOriginalRewardFunction
+from .manipulator_reward_function import ManipulatorRewardFunction
 
 from mbrl.env.reward_fns import reacher
 # from .reach_reward_function import ReachRewardFunction
@@ -57,5 +63,11 @@ DOMAIN_TO_REWARD_FUNCTION = {  # PrefixDict({
     HalfCheetahBackwardsRewardFunction,
     'pets_halfcheetah_jump':
     HalfCheetahJumpRewardFunction,
+    # 'pets_pusher': PusherRewardFunction,
+    'ant_truncated_obs': AntRewardFunction,
+    'ant_truncated_obs_original': AntOriginalRewardFunction,
+    'swimmer-v2': SwimmerRewardFunction,
+    'swimmer_original': SwimmerOriginalRewardFunction,
+    'manipulator': ManipulatorRewardFunction,
     }
 # })

@@ -17,10 +17,10 @@ class BaseRewardFunction(metaclass=ABCMeta):
         raise NotImplementedError
 
     def __call__(self, actions: torch.Tensor, raw_observations: torch.Tensor,
-                 device: str):
+                 device: str, **kwargs):
         # Get rid of one-hot encoding of the task.
-        observations = raw_observations[:, :self.OBS_DIM]
-        rewards = self.get_reward(observations, actions, device)
+        observations = raw_observations[..., :self.OBS_DIM]
+        rewards = self.get_reward(observations, actions, device, **kwargs)
         return rewards.view(-1, 1)
         # rewards = tf.TensorArray(tf.float32, size=observations.shape[0])
         # for i in tf.range(observations.shape[0]):

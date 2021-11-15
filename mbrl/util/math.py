@@ -13,9 +13,8 @@ import torch.nn.functional as F
 import mbrl.types
 
 
-def truncated_linear(
-    min_x: float, max_x: float, min_y: float, max_y: float, x: float
-) -> float:
+def truncated_linear(min_x: float, max_x: float, min_y: float, max_y: float,
+                     x: float) -> float:
     """Truncated linear function.
 
     Implements the following function:
@@ -54,7 +53,12 @@ def gaussian_nll(
         (tensor): the negative log-likelihood.
     """
     l2 = F.mse_loss(pred_mean, target, reduction="none")
+    assert not torch.isnan(pred_logvar).any(), pred_logvar
     inv_var = (-pred_logvar).exp()
+    assert not torch.isnan(inv_var).any(), inv_var
+    inv_var = torch.nan_to_num(inv_var, posinf=1e6)
+    # Make deterministic parts (-inf variance) not count towards the loss
+    pred_logvar = torch.nan_to_num(pred_logvar, neginf=0)
     losses = l2 * inv_var + pred_logvar
     if reduce:
         return losses.sum(dim=1).mean()
@@ -77,14 +81,16 @@ def truncated_normal_(tensor: torch.Tensor, mean: float = 0, std: float = 1):
     """
     torch.nn.init.normal_(tensor, mean=mean, std=std)
     while True:
-        cond = torch.logical_or(tensor < mean - 2 * std, tensor > mean + 2 * std)
+        cond = torch.logical_or(tensor < mean - 2 * std,
+                                tensor > mean + 2 * std)
         if not torch.sum(cond):
             break
         tensor = torch.where(
             cond,
-            torch.nn.init.normal_(
-                torch.ones(tensor.shape, device=tensor.device), mean=mean, std=std
-            ),
+            torch.nn.init.normal_(torch.ones(tensor.shape,
+                                             device=tensor.device),
+                                  mean=mean,
+                                  std=std),
             tensor,
         )
     return tensor
@@ -103,7 +109,10 @@ class Normalizer:
 
     _STATS_FNAME = "env_stats.pickle"
 
-    def __init__(self, in_size: int, device: torch.device, dtype=torch.float32):
+    def __init__(self,
+                 in_size: int,
+                 device: torch.device,
+                 dtype=torch.float32):
         self.mean = torch.zeros((1, in_size), device=device, dtype=dtype)
         self.std = torch.ones((1, in_size), device=device, dtype=dtype)
         self.eps = 1e-12 if dtype == torch.double else 1e-5
@@ -124,7 +133,8 @@ class Normalizer:
         self.std = data.std(0, keepdim=True)
         self.std[self.std < self.eps] = 1.0
 
-    def normalize(self, val: Union[float, mbrl.types.TensorType]) -> torch.Tensor:
+    def normalize(self, val: Union[float,
+                                   mbrl.types.TensorType]) -> torch.Tensor:
         """Normalizes the value according to the stored statistics.
 
         Equivalent to (val - mu) / sigma, where mu and sigma are the stored mean and
@@ -140,7 +150,8 @@ class Normalizer:
             val = torch.from_numpy(val).to(self.device)
         return (val - self.mean) / self.std
 
-    def denormalize(self, val: Union[float, mbrl.types.TensorType]) -> torch.Tensor:
+    def denormalize(self, val: Union[float,
+                                     mbrl.types.TensorType]) -> torch.Tensor:
         """De-normalizes the value according to the stored statistics.
 
         Equivalent to sigma * val + mu, where mu and sigma are the stored mean and
@@ -168,16 +179,17 @@ class Normalizer:
         save_dir = pathlib.Path(save_dir)
         with open(save_dir / self._STATS_FNAME, "wb") as f:
             pickle.dump(
-                {"mean": self.mean.cpu().numpy(), "std": self.std.cpu().numpy()}, f
-            )
+                {
+                    "mean": self.mean.cpu().numpy(),
+                    "std": self.std.cpu().numpy()
+                }, f)
 
 
 # ------------------------------------------------------------------------ #
 # Uncertainty propagation functions
 # ------------------------------------------------------------------------ #
-def propagate_from_indices(
-    predicted_tensor: torch.Tensor, indices: torch.Tensor
-) -> torch.Tensor:
+def propagate_from_indices(predicted_tensor: torch.Tensor,
+                           indices: torch.Tensor) -> torch.Tensor:
     """Propagates ensemble outputs using the given indices.
 
     Args:
@@ -190,12 +202,12 @@ def propagate_from_indices(
         (tensor): the chosen prediction, so that
             `output[i, :] = predicted_tensor[indices[i], i, :]`.
     """
-    return predicted_tensor[indices, torch.arange(predicted_tensor.shape[1]), :]
+    return predicted_tensor[indices,
+                            torch.arange(predicted_tensor.shape[1]), :]
 
 
 def propagate_random_model(
-    predictions: Tuple[torch.Tensor, ...]
-) -> Tuple[torch.Tensor, ...]:
+        predictions: Tuple[torch.Tensor, ...]) -> Tuple[torch.Tensor, ...]:
     """Propagates ensemble outputs by choosing a random model.
 
     Args:
@@ -211,16 +223,15 @@ def propagate_random_model(
     for i, predicted_tensor in enumerate(predictions):
         assert predicted_tensor.ndim == 3
         num_models, batch_size, pred_dim = predicted_tensor.shape
-        model_indices = torch.randint(
-            num_models, size=(batch_size,), device=predicted_tensor.device
-        )
+        model_indices = torch.randint(num_models,
+                                      size=(batch_size, ),
+                                      device=predicted_tensor.device)
         output.append(propagate_from_indices(predicted_tensor, model_indices))
     return tuple(output)
 
 
 def propagate_expectation(
-    predictions: Tuple[torch.Tensor, ...]
-) -> Tuple[torch.Tensor, ...]:
+        predictions: Tuple[torch.Tensor, ...]) -> Tuple[torch.Tensor, ...]:
     """Propagates ensemble outputs by taking expectation over model predictions.
 
     Args:
@@ -240,8 +251,8 @@ def propagate_expectation(
 
 
 def propagate_fixed_model(
-    predictions: Tuple[torch.Tensor, ...], propagation_indices: torch.Tensor
-) -> Tuple[torch.Tensor, ...]:
+        predictions: Tuple[torch.Tensor, ...],
+        propagation_indices: torch.Tensor) -> Tuple[torch.Tensor, ...]:
     """Propagates ensemble outputs by taking expectation over model predictions.
 
     Args:
@@ -258,7 +269,8 @@ def propagate_fixed_model(
     output: List[torch.Tensor] = []
     for i, predicted_tensor in enumerate(predictions):
         assert predicted_tensor.ndim == 3
-        output.append(propagate_from_indices(predicted_tensor, propagation_indices))
+        output.append(
+            propagate_from_indices(predicted_tensor, propagation_indices))
     return tuple(output)
 
 
