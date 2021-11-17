@@ -57,3 +57,12 @@ def reacher(act: torch.Tensor,
                         dim=1)
     reward -= 0.01 * torch.square(act).sum(dim=1)
     return reward.view(-1, 1)
+
+
+def walker2d(act: torch.Tensor,
+             next_obs: torch.Tensor,
+             device: str = '') -> torch.Tensor:
+    velocity_cost = -next_obs[:, 8]  # the qvel for the root-x joint
+    height_cost = 3 * torch.square(next_obs[:, 0] - 1.3)  # the height
+    action_cost = 0.1 * torch.square(act).sum(dim=-1)
+    return (velocity_cost + height_cost - action_cost).view(-1, 1)

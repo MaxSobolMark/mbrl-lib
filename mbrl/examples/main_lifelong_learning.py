@@ -76,6 +76,35 @@ def make_env(
         elif hasattr(cfg.overrides,
                      "reward_fn") and cfg.overrides.reward_fn is not None:
             reward_fn = getattr(mbrl.env.reward_fns, cfg.overrides.reward_fn)
+    elif "mbbl___" in env_name:
+        import mbrl.env
+        task_name = env_name.split("___")[1]
+        if task_name.lower() == 'walker2d':
+            from mbbl.env.gym_env import walker
+            env = walker.env(env_name='gym_walker2d',
+                             rand_seed=1234,
+                             misc_info={'reset_type': 'gym'})
+            env.metadata = {}
+
+            def do_nothing(*args, **kwargs):
+                return
+
+            env.close = do_nothing
+            env.reward_range = {}
+            env.spec = {}
+            env.unwrapped = env
+            env._configured = True
+        else:
+            raise NotImplementedError
+        term_fn = getattr(mbrl.env.termination_fns, cfg.overrides.term_fn)
+        if env_cfg.reward_fn.lower() in DOMAIN_TO_REWARD_FUNCTION:
+            reward_fn = DOMAIN_TO_REWARD_FUNCTION[env_cfg.reward_fn.lower()](
+                env)
+        elif hasattr(env_cfg, "reward_fn") and env_cfg.reward_fn is not None:
+            reward_fn = getattr(mbrl.env.reward_fns, env_cfg.reward_fn)
+        else:
+            reward_fn = getattr(mbrl.env.reward_fns, cfg.overrides.term_fn,
+                                None)
     elif "gym___" in env_name:
         import mbrl.env
         gym_env_name = env_name.split("___")[1]
@@ -145,6 +174,7 @@ def make_env(
     if learned_rewards:
         reward_fn = None
     else:
+        print('[main_lifelong_learning:168] reward_fn: ', reward_fn)
         reward_fn = partial(reward_fn, **env_cfg.get('reward_fn_kwargs', {}))
 
     if env_cfg.get('relabel_env_rewards', False):
@@ -155,9 +185,12 @@ def make_env(
                                        device=cfg.device)
 
     if cfg.seed is not None:
-        env.seed(cfg.seed)
-        env.observation_space.seed(cfg.seed + 1)
-        env.action_space.seed(cfg.seed + 2)
+        if hasattr(env, 'seed'):
+            env.seed(cfg.seed)
+        if hasattr(env.observation_space, 'seed'):
+            env.observation_space.seed(cfg.seed + 1)
+        if hasattr(env.action_space, 'seed'):
+            env.action_space.seed(cfg.seed + 2)
 
     return env, term_fn, reward_fn
 
@@ -171,7 +204,6 @@ def run(cfg: omegaconf.DictConfig):
     lifelong_learning_task_names = []
     lifelong_learning_termination_fns = []
     lifelong_learning_reward_fns = []
-    print('[main_lifelong_learning] cfg: ', cfg)
 
     # num_tasks = len(cfg.overrides.envs)
 

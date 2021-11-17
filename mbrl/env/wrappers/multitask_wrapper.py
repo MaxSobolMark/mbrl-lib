@@ -22,5 +22,8 @@ class MultitaskWrapper(ObservationWrapper):
              np.eye(self._number_of_tasks)[self._task_index]],
             axis=-1)
 
+    def _observation(self, observation):
+        return self.observation(observation)
+
     def __str__(self):
         return f'MultitaskWrapper<{str(self.env)}>(task {self._task_index}_of_{self._number_of_tasks})'
