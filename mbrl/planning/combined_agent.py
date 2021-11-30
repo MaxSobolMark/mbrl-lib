@@ -1,4 +1,4 @@
-from collections import deque
+from collections import defaultdict, deque
 import numpy as np
 import torch
 from typing import Tuple, Dict
@@ -62,6 +62,7 @@ class CombinedAgent(Agent):
         Returns:
             (np.ndarray): the action.
         """
+        original_obs = obs
         if env_steps_this_task == 0:
             self._policy_expected_returns_history.clear()
             self._planner_expected_returns_history.clear()
@@ -77,28 +78,73 @@ class CombinedAgent(Agent):
                 returns_expectation_calculation_method = (
                     self._cfg.overrides.returns_expectation_calculation_method)
                 if returns_expectation_calculation_method == 'last_n_episodes':
+                    print(
+                        '[combined_agent:80] returns_expectation_calculation_method is last_n_episodes'
+                    )
                     last_n_trajectories = (
                         current_task_replay_buffer.get_last_n_trajectories(
-                            self._cfg.overrides.returns_expectation_n_episodes)
+                            self._cfg.overrides.returns_expectation_n_episodes,
+                            trajectory_length=self._cfg.overrides.trial_length)
                     )
                     if last_n_trajectories is not None:
                         obs, *_ = last_n_trajectories.astuple()
+                        # Downsample trajectories for efficiency.
+                        downsampling_rate = self._cfg.overrides.planning_horizon * 2
+                        obs = obs[::downsampling_rate]
+                    else:
+                        print(
+                            '[combined_agent:90] last_n_trajectories is None')
                 # task_episodes = current_task_replay_buffer.get_all()
                 # TODO: DONT EVALUATE WITH EVERYTHING IN THE REPLAY BUFFER
-                planner_action_sequence = self.planning_agent.plan(obs)[
-                    np.newaxis]
-                print('[combined_agent:49] planner_action_sequence.shape: ',
-                      planner_action_sequence.shape)
-                planner_returns_expectation, planner_returns_std = (
-                    self._model_env.evaluate_action_sequences(
-                        torch.Tensor(planner_action_sequence).to(
-                            self._cfg.device),
-                        initial_state=obs,
-                        num_particles=self._cfg.algorithm.num_particles))
+                # obs might have a batch size, but planning has to be
+                # sequential for now.
+                print('[combined_agent:101] obs.shape: ', obs.shape)
+                if len(obs.shape) > 1:
+                    print('calling the planner sequentially.')
+                    planner_action_sequence = []
+                    for o in obs:
+                        planner_action_sequence.append(
+                            self.planning_agent.plan(o))
+                else:
+                    planner_action_sequence = self.planning_agent.plan(obs)[
+                        np.newaxis]
+                if len(obs.shape) > 1:
+                    planner_returns_expectations = 0
+                    planner_returns_stds = 0
+                    planner_diagnostics = defaultdict(float)
+                    for i, o in enumerate(obs):
+                        (planner_returns_expectation, planner_returns_std,
+                         planner_diagnostic
+                         ) = (self._model_env.evaluate_action_sequences(
+                             torch.Tensor(planner_action_sequence[i][None]).to(
+                                 self._cfg.device),
+                             initial_state=o,
+                             num_particles=self._cfg.algorithm.num_particles))
+                        planner_returns_expectations += (
+                            1 / len(obs)) * planner_returns_expectation
+                        planner_returns_stds += (
+                            1 / len(obs)) * planner_returns_std
+                        for key, value in planner_diagnostic.items():
+                            planner_diagnostics[key] += (1 / len(obs)) * value
+                    planner_returns_expectation = planner_returns_expectations
+                    planner_returns_std = planner_returns_stds
+                else:
+                    (planner_returns_expectation, planner_returns_std,
+                     planner_diagnostics) = (
+                         self._model_env.evaluate_action_sequences(
+                             torch.Tensor(planner_action_sequence).to(
+                                 self._cfg.device),
+                             initial_state=obs,
+                             num_particles=self._cfg.algorithm.num_particles))
                 (explicit_policy_returns_expectation,
-                 explicit_policy_returns_std) = self._model_env.evaluate_agent(
+                 explicit_policy_returns_std,
+                 explicit_policy_diagnostics) = self._model_env.evaluate_agent(
                      self.sac_agent, obs, self._cfg.overrides.planning_horizon,
                      self._cfg.algorithm.num_particles)
+                explicit_policy_returns_expectation = explicit_policy_returns_expectation.mean(
+                )
+                explicit_policy_returns_std = explicit_policy_returns_std.mean(
+                )
 
                 self._policy_expected_returns_history.append(
                     explicit_policy_returns_expectation)
@@ -114,7 +160,6 @@ class CombinedAgent(Agent):
                 planner_returns_expectation = sum(
                     self._planner_expected_returns_history) / len(
                         self._planner_expected_returns_history)
-
                 if self._cfg.overrides.get(
                         'combined_policy_prefer_explicit_policy', False):
                     self._policy_to_use_current_epoch = (
@@ -141,6 +186,18 @@ class CombinedAgent(Agent):
                     '_should_mopo_for_planner_be_used':
                     float(self._should_mopo_for_planner_be_used)
                 }
+                # Add diagnostics from the evaluation of planner/policy.
+                for (planner_diagnostic_key,
+                     planner_diagnostic_value) in planner_diagnostics.items():
+                    self._diagnostics[
+                        'planner_diagnostics_' +
+                        planner_diagnostic_key] = planner_diagnostic_value
+                for (policy_diagnostic_key, policy_diagnostic_value
+                     ) in explicit_policy_diagnostics.items():
+                    self._diagnostics[
+                        'policy_diagnostics_' +
+                        policy_diagnostic_key] = policy_diagnostic_value
+
             self._policy_used_history.append(self._policy_to_use_current_epoch)
             if (len(self._policy_used_history) >
                     self.MOPO_ACTIVATION_WINDOW_LENGTH):
@@ -160,12 +217,12 @@ class CombinedAgent(Agent):
                 1 - self.MOPO_ACTIVATION_THRESHOLD)
         if self._policy_to_use_current_epoch == 'planner':
             if return_plan:
-                return self.planning_agent.plan(obs, **kwargs)
-            return self.planning_agent.act(obs, **kwargs)
+                return self.planning_agent.plan(original_obs, **kwargs)
+            return self.planning_agent.act(original_obs, **kwargs)
         else:
             if return_plan:
-                return self.sac_agent.plan(obs, **kwargs)
-            return self.sac_agent.act(obs, **kwargs)
+                return self.sac_agent.plan(original_obs, **kwargs)
+            return self.sac_agent.act(original_obs, **kwargs)
 
         # with pytorch_sac_utils.eval_mode(), torch.no_grad():
         # return self.sac_agent.act(obs, sample=sample, batched=batched)

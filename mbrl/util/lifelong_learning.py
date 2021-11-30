@@ -50,6 +50,7 @@ def general_reward_function(
         rewards = reward_function(actions[indices],
                                   obs[indices],
                                   device=device)
+        rewards = torch.nan_to_num(rewards, nan=0., posinf=1., neginf=-1.)
         if (rewards == -float('inf')).sum() != 0:
             print(
                 f'[lifelong_learning:52] there is a negative infinity in reward function [{i}]. rewards: {rewards}. rewards.min: {rewards.min()}'

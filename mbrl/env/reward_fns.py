@@ -65,4 +65,100 @@ def walker2d(act: torch.Tensor,
     velocity_cost = -next_obs[:, 8]  # the qvel for the root-x joint
     height_cost = 3 * torch.square(next_obs[:, 0] - 1.3)  # the height
     action_cost = 0.1 * torch.square(act).sum(dim=-1)
-    return (velocity_cost + height_cost - action_cost).view(-1, 1)
+    return -(velocity_cost + height_cost + action_cost).view(-1, 1)
+
+
+def walker2d_backwards(act: torch.Tensor,
+                       next_obs: torch.Tensor,
+                       device: str = '') -> torch.Tensor:
+    velocity_cost = next_obs[:, 8]  # the qvel for the root-x joint
+    height_cost = 3 * torch.square(next_obs[:, 0] - 1.3)  # the height
+    action_cost = 0.1 * torch.square(act).sum(dim=-1)
+    return -(velocity_cost + height_cost + action_cost).view(-1, 1)
+
+
+def walker2d_stand(act: torch.Tensor,
+                   next_obs: torch.Tensor,
+                   device: str = '') -> torch.Tensor:
+    velocity_cost = torch.square(next_obs[:, 8])
+    height_cost = 3 * torch.square(next_obs[:, 0] - 1.3)  # the height
+    action_cost = 0.1 * torch.square(act).sum(dim=-1)
+    return -(velocity_cost + height_cost + action_cost).view(-1, 1)
+
+
+def walker2d_stand_and_jump(act: torch.Tensor,
+                            next_obs: torch.Tensor,
+                            device: str = '') -> torch.Tensor:
+    velocity_cost = torch.square(next_obs[:, 8])
+    height_cost = -(next_obs[:, 0] - 1.3)  # the height
+    action_cost = 0.1 * torch.square(act).sum(dim=-1)
+    return -(velocity_cost + height_cost + action_cost).view(-1, 1)
+
+
+def hopper(act: torch.Tensor,
+           next_obs: torch.Tensor,
+           device: str = '') -> torch.Tensor:
+    velocity_cost = -next_obs[:, 5]  # the qvel for the root-x joint
+    height_cost = 3 * torch.square(next_obs[:, 0] - 1.3)  # the height
+    action_cost = 0.1 * torch.square(act).sum(dim=-1)
+    return -(velocity_cost + height_cost + action_cost).view(-1, 1)
+
+
+def hopper_backwards(act: torch.Tensor,
+                     next_obs: torch.Tensor,
+                     device: str = '') -> torch.Tensor:
+    velocity_cost = next_obs[:, 5]  # the negative qvel for the root-x joint
+    height_cost = 3 * torch.square(next_obs[:, 0] - 1.3)  # the height
+    action_cost = 0.1 * torch.square(act).sum(dim=-1)
+    return -(velocity_cost + height_cost + action_cost).view(-1, 1)
+
+
+def hopper_forwards_and_jump(act: torch.Tensor,
+                             next_obs: torch.Tensor,
+                             device: str = '') -> torch.Tensor:
+    velocity_cost = -next_obs[:, 5]  # the qvel for the root-x joint
+    height_cost = -(next_obs[:, 0] - 1.3)  # the height
+    action_cost = 0.1 * torch.square(act).sum(dim=-1)
+    return -(velocity_cost + height_cost + action_cost).view(-1, 1)
+
+
+def swimmer_mbbl(act: torch.Tensor,
+                 next_obs: torch.Tensor,
+                 device: str = '') -> torch.Tensor:
+    velocity_cost = -next_obs[:, 3]  # the qvel for the root-x joint
+    action_cost = 0.0001 * torch.square(act).sum(dim=-1)
+    return -(velocity_cost + action_cost).view(-1, 1)
+
+
+def swimmer_mbbl_backwards(act: torch.Tensor,
+                           next_obs: torch.Tensor,
+                           device: str = '') -> torch.Tensor:
+    velocity_cost = next_obs[:, 3]  # the qvel for the root-x joint
+    action_cost = 0.0001 * torch.square(act).sum(dim=-1)
+    return -(velocity_cost + action_cost).view(-1, 1)
+
+
+def swimmer_mbbl_forwards_up(act: torch.Tensor,
+                             next_obs: torch.Tensor,
+                             device: str = '') -> torch.Tensor:
+    goal = 0.261799  # 15 deg in rads.
+    goal = torch.Tensor([goal]).to(device)
+    direct = torch.Tensor([torch.cos(goal), torch.sin(goal)]).to(device)
+    xy_velocity = next_obs[..., 3:5]
+    x_velocity, y_velocity = xy_velocity.split(1, dim=-1)
+    angle_reward = torch.matmul(xy_velocity, direct)
+    action_cost = 0.0001 * torch.square(act).sum(dim=-1)
+    return (angle_reward - action_cost).view(-1, 1)
+
+
+def swimmer_mbbl_backwards_up(act: torch.Tensor,
+                              next_obs: torch.Tensor,
+                              device: str = '') -> torch.Tensor:
+    goal = 2.87979  # 165 deg in rads.
+    goal = torch.Tensor([goal]).to(device)
+    direct = torch.Tensor([torch.cos(goal), torch.sin(goal)]).to(device)
+    xy_velocity = next_obs[..., 3:5]
+    x_velocity, y_velocity = xy_velocity.split(1, dim=-1)
+    angle_reward = torch.matmul(xy_velocity, direct)
+    action_cost = 0.0001 * torch.square(act).sum(dim=-1)
+    return (angle_reward - action_cost).view(-1, 1)

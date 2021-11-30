@@ -84,18 +84,30 @@ def make_env(
             env = walker.env(env_name='gym_walker2d',
                              rand_seed=1234,
                              misc_info={'reset_type': 'gym'})
-            env.metadata = {}
+        elif task_name.lower() == 'hopper':
+            from mbbl.env.gym_env import walker
+            env = walker.env(env_name='gym_hopper',
+                             rand_seed=1234,
+                             misc_info={'reset_type': 'gym'})
+        elif task_name.lower() == 'swimmer':
+            from mbbl.env.gym_env import walker
+            env = walker.env(env_name='gym_swimmer',
+                             rand_seed=1234,
+                             misc_info={'reset_type': 'gym'})
 
-            def do_nothing(*args, **kwargs):
-                return
-
-            env.close = do_nothing
-            env.reward_range = {}
-            env.spec = {}
-            env.unwrapped = env
-            env._configured = True
         else:
             raise NotImplementedError
+        env.metadata = {}
+
+        def do_nothing(*args, **kwargs):
+            return
+
+        env.close = do_nothing
+        env.reward_range = {}
+        env.spec = {}
+        env.unwrapped = env
+        env.seed = lambda seed: seed
+        env._configured = True
         term_fn = getattr(mbrl.env.termination_fns, cfg.overrides.term_fn)
         if env_cfg.reward_fn.lower() in DOMAIN_TO_REWARD_FUNCTION:
             reward_fn = DOMAIN_TO_REWARD_FUNCTION[env_cfg.reward_fn.lower()](

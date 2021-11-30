@@ -1,6 +1,3 @@
-"""Reward wrapper that gives rewards for positive change in z axis.
-   Based on MOPO: https://arxiv.org/abs/2005.13239"""
-
 from typing import Callable
 from gym import Wrapper
 import torch

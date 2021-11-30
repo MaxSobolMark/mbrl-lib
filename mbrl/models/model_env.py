@@ -176,25 +176,49 @@ class ModelEnv:
         initial_obs_batch = np.tile(
             initial_state,
             (num_particles * population_size, 1)).astype(np.float32)
+
         self.reset(initial_obs_batch, return_as_np=False)
         batch_size = initial_obs_batch.shape[0]
         total_rewards = torch.zeros(batch_size, 1).to(self.device)
         terminated = torch.zeros(batch_size, 1, dtype=bool).to(self.device)
+        imagined_obs_magnitude_mean = 0
+        # imagined_velocity_mean = 0
+        # imagined_height_mean = 0
+        # imagined_height_cost_mean = 0
+        imagined_observations_mean = [0.] * initial_obs_batch.shape[-1]
         for time_step in range(horizon):
             actions_for_step = action_sequences[:, time_step, :]
             action_batch = torch.repeat_interleave(actions_for_step,
                                                    num_particles,
                                                    dim=0)
-            _, rewards, dones, _ = self.step(
+            obs, rewards, dones, _ = self.step(
                 action_batch,
                 sample=True,
                 mopo_penalty_coeff=mopo_penalty_coeff)
             rewards[terminated] = 0
             terminated |= dones
             total_rewards += rewards
+            imagined_obs_magnitude_mean += (1. / horizon) * torch.linalg.norm(
+                obs, dim=-1).mean()
+            # imagined_velocity_mean += (1. / horizon) * obs[:, 5].mean()
+            # imagined_height_mean += (1. / horizon) * obs[:, 0].mean()
+            # imagined_height_cost_mean += (
+            #     1. / horizon) * 3 * torch.square(obs[:, 0] - 1.3).mean()
+            for i in range(len(imagined_observations_mean)):
+                imagined_observations_mean[i] += (1. /
+                                                  horizon) * obs[:, i].mean()
 
         total_rewards = total_rewards.reshape(-1, num_particles)
-        return total_rewards.mean(dim=1), total_rewards.std(dim=1)
+        diagnostics = {
+            'imagined_obs_magnitude_mean': imagined_obs_magnitude_mean,
+            # 'imagined_velocity_mean': imagined_velocity_mean,
+            # 'imagined_height_mean': imagined_height_mean,
+            # 'imagined_height_cost_mean': imagined_height_cost_mean,
+        }
+        for i in range(len(imagined_observations_mean)):
+            diagnostics[
+                f'imagined_obs[{i}]_mean'] = imagined_observations_mean[i]
+        return total_rewards.mean(dim=1), total_rewards.std(dim=1), diagnostics
 
     def evaluate_agent(
         self,
@@ -203,8 +227,6 @@ class ModelEnv:
         horizon: int,
         num_particles: int,
     ) -> torch.Tensor:
-        print('[model_env:189] initial state:', initial_state)
-        print('[model_env:190] num_particles:', num_particles)
         initial_obs_batch = np.tile(initial_state,
                                     (num_particles, 1)).astype(np.float32)
         self.reset(initial_obs_batch, return_as_np=False)
@@ -212,11 +234,35 @@ class ModelEnv:
         total_rewards = torch.zeros(batch_size, 1).to(self.device)
         terminated = torch.zeros(batch_size, 1, dtype=bool).to(self.device)
         obs = torch.Tensor(initial_obs_batch)
+        imagined_obs_magnitude_mean = 0
+        # imagined_velocity_mean = 0
+        # imagined_height_mean = 0
+        # imagined_height_cost_mean = 0
+        imagined_observations_mean = [0.] * initial_obs_batch.shape[-1]
         for time_step in range(horizon):
             actions_for_step = agent.act(obs.to('cpu'), batched=True)
             obs, rewards, dones, _ = self.step(actions_for_step, sample=True)
             rewards[terminated] = 0
             terminated |= dones
             total_rewards += rewards
+            imagined_obs_magnitude_mean += (1. / horizon) * torch.linalg.norm(
+                obs, dim=-1).mean()
+            # imagined_velocity_mean += (1. / horizon) * obs[:, 5].mean()
+            # imagined_height_mean += (1. / horizon) * obs[:, 0].mean()
+            # imagined_height_cost_mean += (
+            #     1. / horizon) * 3 * torch.square(obs[:, 0] - 1.3).mean()
+            for i in range(len(imagined_observations_mean)):
+                imagined_observations_mean[i] += (1. /
+                                                  horizon) * obs[:, i].mean()
+
         total_rewards = total_rewards.reshape(-1, num_particles)
-        return total_rewards.mean(dim=1), total_rewards.std(dim=1)
+        diagnostics = {
+            'imagined_obs_magnitude_mean': imagined_obs_magnitude_mean,
+            # 'imagined_velocity_mean': imagined_velocity_mean,
+            # 'imagined_height_mean': imagined_height_mean,
+            # 'imagined_height_cost_mean': imagined_height_cost_mean,
+        }
+        for i in range(len(imagined_observations_mean)):
+            diagnostics[
+                f'imagined_obs[{i}]_mean'] = imagined_observations_mean[i]
+        return total_rewards.mean(dim=1), total_rewards.std(dim=1), diagnostics
