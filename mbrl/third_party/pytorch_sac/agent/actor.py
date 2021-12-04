@@ -6,7 +6,7 @@ from torch import distributions as pyd
 from torch import nn
 
 from mbrl.third_party.pytorch_sac import utils
-
+from mbrl.third_party.pnn.pnn import PNN
 
 class TanhTransform(pyd.transforms.Transform):
     domain = pyd.constraints.real
@@ -92,5 +92,43 @@ class DiagGaussianActor(nn.Module):
             logger.log_histogram(f"train_actor/{k}_hist", v, step)
 
         for i, m in enumerate(self.trunk):
+            if type(m) == nn.Linear:
+                logger.log_param(f"train_actor/fc{i}", m, step)
+
+
+class PNNDiagGaussianActor(nn.Module):
+    def __init__(self, obs_dim, action_dim, hidden_dim, hidden_depth, log_std_bounds, device):
+        super().__init__()
+        # self.sizes = [obs_dim, hidden_dim, hidden_dim, 2 * action_dim]
+        self.policy = PNN(obs_dim, hidden_dim, 128, 2 * action_dim, device)
+        self.log_std_bounds = log_std_bounds
+        self.outputs = dict()
+        self.apply(utils.weight_init)
+
+    def forward(self, obs):
+        mu, log_std = self.policy.forward(obs).chunk(2, dim=-1)
+
+        # constrain log_std inside [log_std_min, log_std_max]
+        log_std = torch.tanh(log_std)
+        log_std_min, log_std_max = self.log_std_bounds
+        log_std = log_std_min + 0.5 * (log_std_max - log_std_min) * (log_std + 1)
+
+        std = log_std.exp()
+
+        self.outputs["mu"] = mu
+        self.outputs["std"] = std
+
+        dist = SquashedNormal(mu, std)
+        return dist
+
+    def new_task(self):
+        self.policy.new_task()
+        print('actor new task added')
+
+    def log(self, logger, step):
+        for k, v in self.outputs.items():
+            logger.log_histogram(f"train_actor/{k}_hist", v, step)
+
+        for i, m in enumerate(self.policy.columns):
             if type(m) == nn.Linear:
                 logger.log_param(f"train_actor/fc{i}", m, step)
