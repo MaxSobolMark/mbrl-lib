@@ -555,11 +555,15 @@ def step_env_and_add_to_buffer(
         `env.step(agent.act(obs))`.
     """
     action = agent.act(obs, **agent_kwargs)
+    if hasattr(agent, 'get_active_policy'):
+        active_policy = agent.get_active_policy()
+    else:
+        active_policy = None
     gt.stamp('agent.act')
     next_obs, reward, done, info = env.step(action)
     info['action_taken'] = action
     gt.stamp('env.step')
-    replay_buffer.add(obs, action, next_obs, reward, done)
+    replay_buffer.add(obs, action, next_obs, reward, done, active_policy)
     if callback:
         callback((obs, action, next_obs, reward, done))
     gt.stamp('callback')

@@ -4,6 +4,7 @@ import omegaconf
 import torch
 from mbrl.types import RewardFnType
 import mbrl.models
+from mbrl.planning import Agent
 from .replay_buffer import (
     BootstrapIterator,
     ReplayBuffer,
@@ -68,6 +69,7 @@ def train_lifelong_learning_model_and_save_model_and_data(
     task_replay_buffers: List[ReplayBuffer],
     work_dir: Optional[Union[str, pathlib.Path]] = None,
     callback: Optional[Callable] = None,
+    agent: Optional[Agent] = None,
 ):
     """Convenience function for training a model and saving results.
 
@@ -96,6 +98,46 @@ def train_lifelong_learning_model_and_save_model_and_data(
         replay_buffer.get_all(shuffle=True)
         for replay_buffer in task_replay_buffers
     ])
+    if cfg.get('rebalance_dynamics_model_dataset', False):
+        print('[lifelong_learning:103] rebalancing dynamics model dataset.')
+        assert hasattr(agent, 'get_planner_activation_rate')
+        assert hasattr(agent, 'get_active_policy')
+        planner_rebalancing_minimum_activation_rate = cfg.get(
+            'planner_rebalancing_minimum_activation_rate', 0.3)
+        print(
+            '[lifelong_learning:107] planner_rebalancing_minimum_activation_rate: ',
+            planner_rebalancing_minimum_activation_rate)
+        planner_activation_rate = agent.get_planner_activation_rate()
+        if (planner_activation_rate >
+                planner_rebalancing_minimum_activation_rate
+                and agent.get_active_policy() == 1
+            ):  # Consider lowering this, but update new_planner_rate if so.
+            num_planner_steps = sum(data.active_policy)
+            num_policy_steps = len(data.active_policy) - num_planner_steps
+            planner_rate_in_dataset = num_planner_steps / len(
+                data.active_policy)
+            if planner_rate_in_dataset < planner_activation_rate:
+                print('[lifelong_learning:111] actually rebalancing.')
+                # Do a maximum 50% upsampling.
+                new_planner_rate = min(planner_activation_rate, 0.5)
+                new_policy_rate = 1 - new_planner_rate
+                new_dataset_size = num_policy_steps / new_policy_rate
+                total_new_planner_steps = (new_dataset_size *
+                                           planner_activation_rate)
+                new_planner_steps = total_new_planner_steps - num_planner_steps
+                new_planner_data_batches = [
+                    replay_buffer.sample_planner_steps(
+                        int(new_planner_steps // len(task_replay_buffers)))
+                    for replay_buffer in task_replay_buffers
+                ]
+                new_planner_data_batches = concatenate_batches(
+                    new_planner_data_batches)
+                data = concatenate_batches([data, new_planner_data_batches])
+
+    if cfg.get('reshuffle_dynamics_model_dataset', False):
+        print('[lifelong_learning:123] reshuffling dynamics model dataset.')
+        task_replay_buffers[0].shuffle_batch(data)
+
     dataset_train, dataset_val = mbrl.util.common.get_basic_buffer_iterators(
         None,
         cfg.model_batch_size,

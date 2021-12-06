@@ -20,13 +20,16 @@ def _consolidate_batches(
     next_obs = np.empty((len_batches, ) + b0.obs.shape, dtype=b0.obs.dtype)
     rewards = np.empty((len_batches, ) + b0.rewards.shape, dtype=np.float32)
     dones = np.empty((len_batches, ) + b0.dones.shape, dtype=bool)
+    active_policy = np.empty((len_batches, ) + b0.active_policy.shape,
+                             dtype=bool)
     for i, b in enumerate(batches):
         obs[i] = b.obs
         act[i] = b.act
         next_obs[i] = b.next_obs
         rewards[i] = b.rewards
         dones[i] = b.dones
-    return TransitionBatch(obs, act, next_obs, rewards, dones)
+        active_policy[i] = b.active_policy
+    return TransitionBatch(obs, act, next_obs, rewards, dones, active_policy)
 
 
 def concatenate_batches(batches: Sequence[TransitionBatch]) -> TransitionBatch:
@@ -35,7 +38,9 @@ def concatenate_batches(batches: Sequence[TransitionBatch]) -> TransitionBatch:
     next_obs = np.concatenate([batch.next_obs for batch in batches], axis=0)
     rewards = np.concatenate([batch.rewards for batch in batches], axis=0)
     dones = np.concatenate([batch.dones for batch in batches], axis=0)
-    return TransitionBatch(obs, act, next_obs, rewards, dones)
+    active_policy = np.concatenate([batch.active_policy for batch in batches],
+                                   axis=0)
+    return TransitionBatch(obs, act, next_obs, rewards, dones, active_policy)
 
 
 class TransitionIterator:
@@ -346,6 +351,8 @@ class ReplayBuffer:
         self.action = np.empty((capacity, *action_shape), dtype=action_type)
         self.reward = np.empty(capacity, dtype=reward_type)
         self.done = np.empty(capacity, dtype=bool)
+        # For active policy 0 means explicit policy and 1 planner.
+        self.active_policy = np.empty(capacity, dtype=bool)
 
         if rng is None:
             self._rng = np.random.default_rng()
@@ -419,6 +426,7 @@ class ReplayBuffer:
         next_obs: np.ndarray,
         reward: float,
         done: bool,
+        active_policy: bool,
     ):
         """Adds a transition (s, a, s', r, done) to the replay buffer.
 
@@ -434,6 +442,7 @@ class ReplayBuffer:
         self.action[self.cur_idx] = action
         self.reward[self.cur_idx] = reward
         self.done[self.cur_idx] = done
+        self.active_policy[self.cur_idx] = active_policy
 
         if self.trajectory_indices is not None:
             self._trajectory_bookkeeping(done)
@@ -453,6 +462,14 @@ class ReplayBuffer:
             to (obs[i], act[i], next_obs[i], rewards[i], dones[i]).
         """
         indices = self._rng.choice(self.num_stored, size=batch_size)
+        return self._batch_from_indices(indices)
+
+    def sample_planner_steps(self, batch_size: int) -> TransitionBatch:
+        possible_indices = np.where(self.active_policy[:self.num_stored])[0]
+        if len(possible_indices) > 0 and batch_size > 0:
+            indices = self._rng.choice(possible_indices, size=batch_size)
+        else:
+            indices = []
         return self._batch_from_indices(indices)
 
     def sample_trajectory(self) -> Optional[TransitionBatch]:
@@ -496,8 +513,10 @@ class ReplayBuffer:
         action = self.action[indices]
         reward = self.reward[indices]
         done = self.done[indices]
+        active_policy = self.active_policy[indices]
 
-        return TransitionBatch(obs, action, next_obs, reward, done)
+        return TransitionBatch(obs, action, next_obs, reward, done,
+                               active_policy)
 
     def __len__(self):
         return self.num_stored
@@ -517,6 +536,7 @@ class ReplayBuffer:
             action=self.action[:self.num_stored],
             reward=self.reward[:self.num_stored],
             done=self.done[:self.num_stored],
+            active_policy=self.active_policy[:self.num_stored],
         )
 
     def load(self, load_dir: Union[pathlib.Path, str]):
@@ -533,6 +553,7 @@ class ReplayBuffer:
         self.action[:num_stored] = data["action"]
         self.reward[:num_stored] = data["reward"]
         self.done[:num_stored] = data["done"]
+        self.active_policy[:num_stored] = data["active_policy"]
         self.num_stored = num_stored
         self.cur_idx = self.num_stored % self.capacity
 
@@ -597,3 +618,12 @@ class ReplayBuffer:
     @property
     def rng(self) -> np.random.Generator:
         return self._rng
+
+    def shuffle_batch(self, batch: TransitionBatch):
+        permutation = self._rng.permutation(len(batch.obs))
+        batch.obs = batch.obs[permutation]
+        batch.next_obs = batch.next_obs[permutation]
+        batch.act = batch.act[permutation]
+        batch.rewards = batch.rewards[permutation]
+        batch.dones = batch.dones[permutation]
+        batch.active_policy = batch.active_policy[permutation]

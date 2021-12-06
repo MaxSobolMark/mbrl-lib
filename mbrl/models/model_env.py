@@ -81,7 +81,7 @@ class ModelEnv:
         """
         assert len(initial_obs_batch.shape) == 2  # batch, obs_dim
         batch = mbrl.types.TransitionBatch(
-            initial_obs_batch.astype(np.float32), None, None, None, None)
+            initial_obs_batch.astype(np.float32), None, None, None, None, None)
         self._current_obs = self.dynamics_model.reset(batch, rng=self._rng)
         self._return_as_np = return_as_np
         if self._return_as_np:
@@ -115,7 +115,7 @@ class ModelEnv:
             if isinstance(actions, np.ndarray):
                 actions = torch.from_numpy(actions).to(self.device)
             model_in = mbrl.types.TransitionBatch(self._current_obs, actions,
-                                                  None, None, None)
+                                                  None, None, None, None)
             (next_observs,
              pred_rewards), variances = self.dynamics_model.sample(
                  model_in,

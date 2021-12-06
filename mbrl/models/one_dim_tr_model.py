@@ -128,7 +128,7 @@ class OneDTransitionRewardModel(Model):
     def _get_model_input_and_target_from_batch(
         self, batch: mbrl.types.TransitionBatch
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        obs, action, next_obs, reward, _ = batch.astuple()
+        obs, action, next_obs, reward, _, _ = batch.astuple()
         if self.target_is_delta:
             target_obs = next_obs - obs
             for dim in self.no_delta_list:

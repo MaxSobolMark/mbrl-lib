@@ -250,6 +250,7 @@ def train(
                         cfg.overrides,
                         task_replay_buffers,
                         work_dir=work_dir,
+                        agent=agent,
                     )
                     gt.stamp('train_model')
 

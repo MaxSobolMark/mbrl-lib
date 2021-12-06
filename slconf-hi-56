@@ -1,7 +1,7 @@
---partition=iris
+--partition=iris-hi
 --qos=normal
---exclude=iris3,iris5,iris6
---time=72:00:00
+--exclude=iris1,iris2,iris3,iris4,iris-hp-z8
+--time=48:00:00
 --nodes=1
 --cpus-per-task=4
 --mem=20G

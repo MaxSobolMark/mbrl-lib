@@ -41,6 +41,13 @@ class CombinedAgent(Agent):
     def get_active_policy(self):
         return 1 if self._policy_to_use_current_epoch == 'planner' else 0
 
+    def get_planner_activation_rate(self) -> float:
+        times_planner_was_used = 0
+        for policy_used in self._policy_used_history:
+            if policy_used == 'planner':
+                times_planner_was_used += 1
+        return times_planner_was_used / max(len(self._policy_used_history), 1)
+
     def act(self,
             obs: np.ndarray,
             current_task_index: int,
@@ -202,19 +209,12 @@ class CombinedAgent(Agent):
             if (len(self._policy_used_history) >
                     self.MOPO_ACTIVATION_WINDOW_LENGTH):
                 self._policy_used_history.popleft()
-            times_planner_was_used = 0
-            times_policy_was_used = 0
-            for policy_used in self._policy_used_history:
-                if policy_used == 'planner':
-                    times_planner_was_used += 1
-                else:
-                    times_policy_was_used += 1
+            planner_activation_rate = self.get_planner_activation_rate()
+            policy_activation_rate = 1 - planner_activation_rate
             self._should_mopo_for_policy_be_used = (
-                times_policy_was_used / len(self._policy_used_history) <
-                self.MOPO_ACTIVATION_THRESHOLD)
+                policy_activation_rate < self.MOPO_ACTIVATION_THRESHOLD)
             self._should_mopo_for_planner_be_used = (
-                times_planner_was_used / len(self._policy_used_history) <
-                1 - self.MOPO_ACTIVATION_THRESHOLD)
+                planner_activation_rate < self.MOPO_ACTIVATION_THRESHOLD)
         if self._policy_to_use_current_epoch == 'planner':
             if return_plan:
                 return self.planning_agent.plan(original_obs, **kwargs)

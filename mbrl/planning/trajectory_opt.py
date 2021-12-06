@@ -3,7 +3,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 import time
-from typing import Callable, List, Optional, Sequence, cast
+from typing import Callable, Dict, List, Optional, Sequence, cast
 
 import hydra
 import numpy as np
@@ -416,6 +416,7 @@ class TrajectoryOptimizerAgent(Agent):
         self.actions_to_use: List[np.ndarray] = []
         self.replan_freq = replan_freq
         self.verbose = verbose
+        self._diagnostics = {}
 
     def set_trajectory_eval_fn(
             self, trajectory_eval_fn: mbrl.types.TrajectoryEvalFnType):
@@ -465,8 +466,30 @@ class TrajectoryOptimizerAgent(Agent):
             def trajectory_eval_fn(action_sequences):
                 return self.trajectory_eval_fn(obs, action_sequences)
 
+            def callback_for_diagnostics(
+                    full_population_tensor: torch.Tensor,
+                    objective_function_values: torch.Tensor,
+                    current_iteration_index: int) -> None:
+                self._diagnostics = {
+                    'planner_full_population_mean':
+                    full_population_tensor.mean(),
+                    'planner_full_population_min':
+                    full_population_tensor.min(),
+                    'planner_full_population_max':
+                    full_population_tensor.max(),
+                    'planner_objective_function_values_mean':
+                    objective_function_values.mean(),
+                    'planner_objective_function_values_min':
+                    objective_function_values.min(),
+                    'planner_objective_function_values_max':
+                    objective_function_values.max(),
+                    'planner_current_iteration_index':
+                    current_iteration_index,
+                }
+
             start_time = time.time()
-            plan = self.optimizer.optimize(trajectory_eval_fn)
+            plan = self.optimizer.optimize(trajectory_eval_fn,
+                                           callback=callback_for_diagnostics)
             plan_time = time.time() - start_time
 
             self.actions_to_use.extend([a for a in plan[:self.replan_freq]])
@@ -497,6 +520,9 @@ class TrajectoryOptimizerAgent(Agent):
 
         plan = self.optimizer.optimize(trajectory_eval_fn)
         return plan
+
+    def get_episode_diagnostics(self) -> Dict[str, float]:
+        return self._diagnostics
 
 
 def create_trajectory_optim_agent_for_model(
