@@ -81,6 +81,7 @@ class OneDTransitionRewardModel(Model):
         obs_process_fn: Optional[mbrl.types.ObsProcessFnType] = None,
         no_delta_list: Optional[List[int]] = None,
         num_elites: Optional[int] = None,
+        action_shape: Optional[Tuple[int, ...]] = None,
     ):
         super().__init__()
         self.model = model
@@ -91,6 +92,7 @@ class OneDTransitionRewardModel(Model):
                 self.model.device,
                 dtype=torch.double
                 if normalize_double_precision else torch.float,
+                action_dim=np.prod(action_shape),
             )
         self.device = self.model.device
         self.learned_rewards = learned_rewards

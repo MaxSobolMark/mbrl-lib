@@ -3,7 +3,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 from dataclasses import dataclass
-from typing import Callable, Optional, Tuple, Union
+from typing import Callable, Dict, Optional, Tuple, Union
 
 import numpy as np
 import torch
@@ -12,7 +12,9 @@ RewardFnType = Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
 TermFnType = Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
 ObsProcessFnType = Callable[[np.ndarray], np.ndarray]
 TensorType = Union[torch.Tensor, np.ndarray]
-TrajectoryEvalFnType = Callable[[TensorType, torch.Tensor], torch.Tensor]
+TrajectoryEvalFnType = Callable[[TensorType, torch.Tensor],
+                                Tuple[torch.Tensor, torch.Tensor,
+                                      Dict[str, torch.Tensor]]]
 
 Transition = Tuple[TensorType, TensorType, TensorType, TensorType, TensorType,
                    Optional[TensorType]]

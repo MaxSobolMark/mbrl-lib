@@ -3,7 +3,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 import time
-from typing import Callable, Dict, List, Optional, Sequence, cast
+from typing import Callable, Dict, List, Optional, Sequence, Tuple, cast
 
 import hydra
 import numpy as np
@@ -24,14 +24,14 @@ class Optimizer:
 
     def optimize(
         self,
-        obj_fun: Callable[[torch.Tensor], torch.Tensor],
+        obj_fun: mbrl.types.TrajectoryEvalFnType,
         x0: Optional[torch.Tensor] = None,
         **kwargs,
     ) -> torch.Tensor:
         """Runs optimization.
 
         Args:
-            obj_fun (callable(tensor) -> tensor): objective function to maximize.
+            obj_fun (callable(tensor) -> TrajectoryEvalFnType): objective function to maximize.
             x0 (tensor, optional): initial solution, if necessary.
 
         Returns:
@@ -96,19 +96,21 @@ class CEMOptimizer(Optimizer):
 
     def optimize(
         self,
-        obj_fun: Callable[[torch.Tensor], torch.Tensor],
+        obj_fun: mbrl.types.TrajectoryEvalFnType,
         x0: Optional[torch.Tensor] = None,
-        callback: Optional[Callable[[torch.Tensor, torch.Tensor, int],
-                                    None]] = None,
+        callback: Optional[Callable[[
+            torch.Tensor, torch.Tensor, torch.Tensor, Dict[str,
+                                                           torch.Tensor], int
+        ], None]] = None,
         **kwargs,
     ) -> torch.Tensor:
         """Runs the optimization using CEM.
 
         Args:
-            obj_fun (callable(tensor) -> tensor): objective function to maximize.
+            obj_fun (callable(tensor) -> TrajectoryEvalFnType): objective function to maximize.
             x0 (tensor, optional): initial mean for the population. Must
                 be consistent with lower/upper bounds.
-            callback (callable(tensor, tensor, int) -> any, optional): if given, this
+            callback (callable(tensor, tensor, tensor, Dict[str, tensor], int) -> any, optional): if given, this
                 function will be called after every iteration, passing it as input the full
                 population tensor, its corresponding objective function values, and
                 the index of the current iteration. This can be used for logging and plotting
@@ -134,10 +136,12 @@ class CEMOptimizer(Optimizer):
             population = mbrl.util.math.truncated_normal_(population)
             population = population * torch.sqrt(constrained_var) + mu
 
-            values = obj_fun(population)
+            values, values_std, objective_function_diagnostics = obj_fun(
+                population)
 
             if callback is not None:
-                callback(population, values, i)
+                callback(population, values, values_std,
+                         objective_function_diagnostics, i)
 
             # filter out NaN values
             values[values.isnan()] = -1e-10
@@ -332,7 +336,9 @@ class TrajectoryOptimizer:
 
     def optimize(
         self,
-        trajectory_eval_fn: Callable[[torch.Tensor], torch.Tensor],
+        trajectory_eval_fn: Callable[[torch.Tensor],
+                                     Tuple[torch.Tensor, torch.Tensor,
+                                           Dict[str, torch.Tensor]]],
         callback: Optional[Callable] = None,
     ) -> np.ndarray:
         """Runs the trajectory optimization.
@@ -469,6 +475,8 @@ class TrajectoryOptimizerAgent(Agent):
             def callback_for_diagnostics(
                     full_population_tensor: torch.Tensor,
                     objective_function_values: torch.Tensor,
+                    objective_function_values_std: torch.Tensor,
+                    objective_function_diagnostics: Dict[str, torch.Tensor],
                     current_iteration_index: int) -> None:
                 self._diagnostics = {
                     'planner_full_population_mean':
@@ -483,9 +491,20 @@ class TrajectoryOptimizerAgent(Agent):
                     objective_function_values.min(),
                     'planner_objective_function_values_max':
                     objective_function_values.max(),
+                    'planner_objective_function_values_std_mean':
+                    objective_function_values_std.mean(),
+                    'planner_objective_function_values_std_min':
+                    objective_function_values_std.min(),
+                    'planner_objective_function_values_std_max':
+                    objective_function_values_std.max(),
                     'planner_current_iteration_index':
                     current_iteration_index,
                 }
+                objective_function_diagnostics = {
+                    f'planner_objective_fn_diagnostics_{key}': value
+                    for key, value in objective_function_diagnostics.items()
+                }
+                self._diagnostics.update(objective_function_diagnostics)
 
             start_time = time.time()
             plan = self.optimizer.optimize(trajectory_eval_fn,
@@ -559,7 +578,7 @@ def create_trajectory_optim_agent_for_model(
             action_sequences,
             initial_state=initial_state,
             num_particles=num_particles,
-            mopo_penalty_coeff=mopo_penalty_coeff)[0]
+            mopo_penalty_coeff=mopo_penalty_coeff)
 
     agent.set_trajectory_eval_fn(trajectory_eval_fn)
     return agent

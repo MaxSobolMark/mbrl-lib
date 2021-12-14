@@ -112,11 +112,13 @@ class Normalizer:
     def __init__(self,
                  in_size: int,
                  device: torch.device,
-                 dtype=torch.float32):
+                 dtype=torch.float32,
+                 action_dim: Optional[int] = None):
         self.mean = torch.zeros((1, in_size), device=device, dtype=dtype)
         self.std = torch.ones((1, in_size), device=device, dtype=dtype)
         self.eps = 1e-12 if dtype == torch.double else 1e-5
         self.device = device
+        self._action_dim = action_dim
 
     def update_stats(self, data: mbrl.types.TensorType):
         """Updates the stored statistics using the given data.
@@ -126,9 +128,17 @@ class Normalizer:
         Args:
             data (np.ndarray or torch.Tensor): The data used to compute the statistics.
         """
-        assert data.ndim == 2 and data.shape[1] == self.mean.shape[1]
         if isinstance(data, np.ndarray):
             data = torch.from_numpy(data).to(self.device)
+        # assert data.ndim == 2 and data.shape[1] == self.mean.shape[1]
+        assert data.ndim == 2
+        if data.shape[1] > self.mean.shape[1]:
+            # data includes task indices, remove them.
+            task_indices_length = data.shape[1] - self.mean.shape[1]
+            actions = data[:, -self._action_dim:]
+            data = data[:, :-(task_indices_length + self._action_dim)]
+            data = torch.cat([data, actions], dim=-1)
+        assert data.shape[1] == self.mean.shape[1]
         self.mean = data.mean(0, keepdim=True)
         self.std = data.std(0, keepdim=True)
         self.std[self.std < self.eps] = 1.0
@@ -148,7 +158,21 @@ class Normalizer:
         """
         if isinstance(val, np.ndarray):
             val = torch.from_numpy(val).to(self.device)
-        return (val - self.mean) / self.std
+        original_val = val
+        task_indices_length = val.shape[-1] - self.mean.shape[1]
+        actions = val[..., -self._action_dim:]
+        val = val[..., :-(task_indices_length + self._action_dim)]
+        val = torch.cat([val, actions], dim=-1)
+        val = (val - self.mean) / self.std
+        val = torch.cat([
+            val[..., :-self._action_dim],
+            original_val[..., -(task_indices_length +
+                                self._action_dim):-self._action_dim],
+            val[..., -self._action_dim:]
+        ],
+                        dim=-1)
+        assert original_val.shape == val.shape
+        return val
 
     def denormalize(self, val: Union[float,
                                      mbrl.types.TensorType]) -> torch.Tensor:
@@ -165,7 +189,19 @@ class Normalizer:
         """
         if isinstance(val, np.ndarray):
             val = torch.from_numpy(val).to(self.device)
-        return self.std * val + self.mean
+        task_indices_length = val.shape[-1] - self.mean.shape[1]
+        normalized_part = val[..., :-(task_indices_length + self._action_dim)]
+        normalized_part = torch.cat(
+            [normalized_part, val[..., -self._action_dim:]], dim=-1)
+        denormalized_part = self.std * normalized_part + self.mean
+        denormalized_val = torch.cat([
+            denormalized_part[..., :-self._action_dim],
+            val[...,
+                -(task_indices_length + self._action_dim):-self._action_dim],
+            denormalized_part[..., -self._action_dim:]
+        ],
+                                     dim=-1)
+        return denormalized_val
 
     def load(self, results_dir: Union[str, pathlib.Path]):
         """Loads saved statistics from the given path."""
