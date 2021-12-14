@@ -81,6 +81,7 @@ class GaussianMLP(Ensemble):
         deterministic: bool = False,
         propagation_method: Optional[str] = None,
         learn_logvar_bounds: bool = False,
+        clip_mean: bool = False,
     ):
         super().__init__(ensemble_size,
                          device,
@@ -106,10 +107,16 @@ class GaussianMLP(Ensemble):
                     activation_cls(),
                 ))
         self.hidden_layers = nn.Sequential(*hidden_layers)
+        self._clip_mean = clip_mean
 
         if deterministic:
             self.mean_and_logvar = create_linear_layer(hid_size, out_size)
         else:
+            if clip_mean:
+                self.min_mean = nn.Parameter(-100 * torch.ones(1, out_size),
+                                             requires_grad=False)
+                self.max_mean = nn.Parameter(100 * torch.ones(1, out_size),
+                                             requires_grad=False)
             self.mean_and_logvar = create_linear_layer(hid_size, 2 * out_size)
             self.min_logvar = nn.Parameter(-10 * torch.ones(1, out_size),
                                            requires_grad=learn_logvar_bounds)
@@ -147,6 +154,9 @@ class GaussianMLP(Ensemble):
             return mean_and_logvar, None
         else:
             mean = mean_and_logvar[..., :self.out_size]
+            if self._clip_mean:
+                mean = self.max_mean - F.softplus(self.max_mean - mean)
+                mean = self.min_mean + F.softplus(mean - self.min_mean)
             logvar = mean_and_logvar[..., self.out_size:]
             logvar = self.max_logvar - F.softplus(self.max_logvar - logvar)
             logvar = self.min_logvar + F.softplus(logvar - self.min_logvar)
