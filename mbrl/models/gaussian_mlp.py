@@ -113,9 +113,9 @@ class GaussianMLP(Ensemble):
             self.mean_and_logvar = create_linear_layer(hid_size, out_size)
         else:
             if clip_mean:
-                self.min_mean = nn.Parameter(-100 * torch.ones(1, out_size),
+                self.min_mean = nn.Parameter(-10 * torch.ones(1, out_size),
                                              requires_grad=False)
-                self.max_mean = nn.Parameter(100 * torch.ones(1, out_size),
+                self.max_mean = nn.Parameter(10 * torch.ones(1, out_size),
                                              requires_grad=False)
             self.mean_and_logvar = create_linear_layer(hid_size, 2 * out_size)
             self.min_logvar = nn.Parameter(-10 * torch.ones(1, out_size),

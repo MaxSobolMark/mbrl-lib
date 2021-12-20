@@ -539,13 +539,12 @@ class ReplayBuffer:
             active_policy=self.active_policy[:self.num_stored],
         )
 
-    def load(self, load_dir: Union[pathlib.Path, str]):
-        """Loads transition data from a given directory.
+    def load_file(self, path: Union[pathlib.Path, str]):
+        """Loads transition data from a given path.
 
         Args:
-            load_dir (str): the directory where the buffer is stored.
+            path (str): the path where the buffer is stored.
         """
-        path = pathlib.Path(load_dir) / "replay_buffer.npz"
         data = np.load(path)
         num_stored = len(data["obs"])
         self.obs[:num_stored] = data["obs"]
@@ -556,6 +555,15 @@ class ReplayBuffer:
         self.active_policy[:num_stored] = data["active_policy"]
         self.num_stored = num_stored
         self.cur_idx = self.num_stored % self.capacity
+
+    def load(self, load_dir: Union[pathlib.Path, str]):
+        """Loads transition data from a given directory.
+
+        Args:
+            load_dir (str): the directory where the buffer is stored.
+        """
+        path = pathlib.Path(load_dir) / "replay_buffer.npz"
+        self.load_file(path)
 
     def get_all(self, shuffle: bool = False) -> TransitionBatch:
         """Returns all data stored in the replay buffer.

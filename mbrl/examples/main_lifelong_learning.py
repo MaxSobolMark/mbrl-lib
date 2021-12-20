@@ -238,8 +238,8 @@ def run(cfg: omegaconf.DictConfig):
         lifelong_learning_termination_fns[:num_tasks])
     lifelong_learning_reward_fns = lifelong_learning_reward_fns[:num_tasks]
     for i in range(len(lifelong_learning_envs)):
-        lifelong_learning_envs[i] = MultitaskWrapper(lifelong_learning_envs[i],
-                                                     i, num_tasks)
+        lifelong_learning_envs[i] = MultitaskWrapper(
+            lifelong_learning_envs[i], i, cfg.overrides.num_distinct_envs)
 
     print(
         f'[main_lifelong_learning:97] lifelong_learning_envs: {lifelong_learning_envs}'

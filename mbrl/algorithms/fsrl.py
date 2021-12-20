@@ -113,7 +113,7 @@ def train(
     #     forward_postprocess_fn = None
     dynamics_model = LifelongLearningModel(
         dynamics_model,
-        num_tasks,
+        cfg.overrides.num_distinct_envs,
         obs_shape,
         act_shape,
         cfg,
@@ -197,6 +197,38 @@ def train(
         raise NotImplementedError
 
     gt.stamp('initialization')
+
+    # ---------------------------------------------------------
+    # ------------------- Checkpoint loading ------------------
+
+    if cfg.overrides.get('load_from_checkpoint_path', None) is not None:
+        checkpoint_path = cfg.overrides.load_from_checkpoint_path
+        print('[fsrl.py:205] LOADING FROM CHECKPOINT: ', checkpoint_path)
+        dynamics_model.load_state_dict(
+            torch.load(os.path.join(checkpoint_path, 'model.pth')))
+        sac_agent.critic.load_state_dict(
+            torch.load(os.path.join(checkpoint_path, 'critic.pth')))
+        sac_agent.actor.load_state_dict(
+            torch.load(os.path.join(checkpoint_path, 'actor.pth')))
+        task_buffers_to_load = cfg.overrides.get('task_buffers_to_load', 0)
+        print('[fsrl.py:214] task buffers to load from checkpoint: ',
+              task_buffers_to_load)
+        for task_buffer_to_load_index in task_buffers_to_load:
+            task_replay_buffer = mbrl.util.common.create_replay_buffer(
+                cfg,
+                obs_shape,
+                act_shape,
+                rng=rng,
+                obs_type=dtype,
+                action_type=dtype,
+                reward_type=dtype,
+            )
+            task_replay_buffer.load_file(
+                os.path.join(
+                    checkpoint_path,
+                    f'replay_buffer_task-{task_buffer_to_load_index}.npz'))
+            task_replay_buffers.append(task_replay_buffer)
+            active_task_buffers.add(task_replay_buffer)
 
     # ---------------------------------------------------------
     # --------------------- Training Loop ---------------------

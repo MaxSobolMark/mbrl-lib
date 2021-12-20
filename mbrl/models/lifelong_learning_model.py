@@ -69,7 +69,6 @@ class LifelongLearningModel():  # Model):
         # Make the dimensions of the task ID not delta.
         # Extend the no_delta_list with -1, -2, -3, ..., -self._num_tasks.
         print('self._model.no_delta_list: ', self._model.no_delta_list)
-        print('asdasd: ', list(range(-1, -self._num_tasks - 1, -1)))
         self._model.no_delta_list.extend(
             list(range(-1, -self._num_tasks - 1, -1)))
 
